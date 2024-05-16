@@ -13,18 +13,22 @@ use stylus_sdk::{
     prelude::*,
     storage::{
         StorageAddress, StorageArray, StorageB256, StorageB32, StorageMap, StorageString,
-        StorageU256,
+        StorageU256, StorageU64,
     },
 };
 
-// Define the user data on the given plateform
+/// Define the user consumption data on the given plateform
 #[solidity_storage]
-pub struct UserPlatformData {
+pub struct UserConsumption {
     ccu: StorageU256,
-    u_block: StorageU256,
+    update_timestamp: StorageU64,
 }
 
-// Define the palteform metadata
+/// Define the type of user consumption, in an ideal world, it should be a sol type
+/// TODO: When alloy-rs is updated on the stylus SDK, use a sol! macro to define the type
+type UserConsumptionType = (U256, U256);
+
+/// Define the palteform metadata
 #[solidity_storage]
 pub struct PlatformMetadata {
     name: StorageString,
@@ -34,40 +38,62 @@ pub struct PlatformMetadata {
     public_key: StorageArray<StorageU256, 4>,
 }
 
+/// Define the type of the plateform metadata, in an ideal world, it should be a sol type
+/// TODO: When alloy-rs is updated on the stylus SDK, use a sol! macro to define the type
+type PlatformMetadataType = (
+    String,
+    Address,
+    FixedBytes<4>,
+    FixedBytes<32>,
+    (U256, U256, U256, U256),
+);
+
 // Define the global conntract storage
 #[solidity_storage]
 #[entrypoint]
 pub struct ContentConsumptionContract {
-    // The user activity storage (user => plateform_id => UserPlatformData)
-    user_activity: StorageMap<Address, StorageMap<B128, UserPlatformData>>,
+    // The user activity storage (user => plateform_id => UserConsumption)
+    user_consumptions: StorageMap<Address, StorageMap<B128, UserConsumption>>,
     // The plateform metadata storage (plateform_id => PlatformMetadata)
-    platform_data: StorageMap<B128, PlatformMetadata>
+    platform_data: StorageMap<B128, PlatformMetadata>,
 }
 
 /// Declare that `ContentConsumptionContract` is a contract with the following external methods.
 #[external]
 impl ContentConsumptionContract {
+    /* -------------------------------------------------------------------------- */
+    /*                          Consumption read methods                          */
+    /* -------------------------------------------------------------------------- */
+
+    /// Get the user consumption on a content
+    #[selector(name = "getUserConsumption")]
+    pub fn get_user_consumption(
+        &self,
+        user: Address,
+        plateform_id: B128,
+    ) -> Result<UserConsumptionType, Vec<u8>> {
+        // Get the ptr to the plateform metadata
+        let user_ptr = self.user_consumptions.get(user);
+        let ptr = user_ptr.get(plateform_id);
+        // Return every field we are interested in
+        Ok((
+            // CCU + update time
+            ptr.ccu.get(),
+            U256::from(ptr.update_timestamp.get()),
+        ))
+    }
 
     /* -------------------------------------------------------------------------- */
     /*                           Plateform read methods                           */
     /* -------------------------------------------------------------------------- */
 
     /// Get a plateform metadatas
-    /// TODO: Can the result be replaced by a struct or smth like that?
+    /// TODO: Pub key could be a B1024, should find a way to concat it to that type (but not aliased from the stylus SDK)
     #[selector(name = "getPlateformMetadatas")]
     pub fn get_plateform_metadatas(
         &self,
         plateform_id: B128,
-    ) -> Result<
-        (
-            String,
-            Address,
-            FixedBytes<4>,
-            FixedBytes<32>,
-            (U256, U256, U256, U256),
-        ),
-        Vec<u8>,
-    > {
+    ) -> Result<PlatformMetadataType, Vec<u8>> {
         // Get the ptr to the plateform metadata
         let ptr = self.platform_data.get(plateform_id);
         // Return every field we are interested in
