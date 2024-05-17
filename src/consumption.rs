@@ -2,10 +2,21 @@ use alloc::{vec, vec::Vec};
 
 /// Import items from the SDK. The prelude contains common traits and macros.
 use stylus_sdk::{
-    alloy_primitives::{Address, B128, U256},
+    alloy_primitives::{Address, B128, U256, U64},
+    alloy_sol_types::sol,
+    block::{self},
     prelude::*,
     storage::{StorageMap, StorageU256, StorageU64},
 };
+
+// Define events and errors in the contract
+sol! {
+    error TooCloseConsumptiom();
+}
+#[derive(SolidityError)]
+pub enum ConsumptionError {
+    TooCloseConsumptiom(TooCloseConsumptiom),
+}
 
 /// Define the user consumption data on the given plateform
 #[solidity_storage]
@@ -25,7 +36,49 @@ pub struct ConsumptionContract {
     user_consumptions: StorageMap<Address, StorageMap<B128, UserConsumption>>,
 }
 
-/// Declare that `ConsumptionContract` is a contract with the following external methods.
+/// Internal method stuff
+impl ConsumptionContract {
+    /// Update a user cosnumption by the given `added_consumption`
+    fn _update_user_consumption(
+        &mut self,
+        user: Address,
+        plateform_id: B128,
+        added_consumption: U256,
+    ) -> Result<(), ConsumptionError> {
+        // Get the current state
+        let mut user_consumption = self.user_consumptions.setter(user);
+        let mut plateform_user_consumption = user_consumption.setter(plateform_id);
+        let last_update = plateform_user_consumption
+            .update_timestamp
+            .get()
+            .to::<u64>();
+        let last_ccu = plateform_user_consumption.ccu.get();
+
+        // Get the current timestamp
+        let current_timestamp = block::timestamp();
+
+        // If last update was less than one minute ago, abort
+        if (last_update + 60) > current_timestamp {
+            return Err(ConsumptionError::TooCloseConsumptiom(
+                TooCloseConsumptiom {},
+            ));
+        }
+
+        // Update the ccu amount
+        plateform_user_consumption
+            .ccu
+            .set(last_ccu + added_consumption);
+        // Update the update timestamp
+        plateform_user_consumption
+            .update_timestamp
+            .set(U64::from(current_timestamp));
+
+        // Return a success
+        Ok(())
+    }
+}
+
+/// External method stuff
 #[external]
 impl ConsumptionContract {
     /* -------------------------------------------------------------------------- */

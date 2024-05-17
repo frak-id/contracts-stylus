@@ -31,18 +31,14 @@ pub struct ContentConsumptionContract {
 #[external]
 #[inherit(PlateformContract, ConsumptionContract)]
 impl ContentConsumptionContract {
-
     /* -------------------------------------------------------------------------- */
     /*                          Consumption read methods                          */
     /* -------------------------------------------------------------------------- */
 
     /// Get the user consumption on a content
     #[selector(name = "test")]
-    pub fn test(
-        &self
-    ) -> Result<String, Vec<u8>> {
+    pub fn test(&self) -> Result<String, Vec<u8>> {
         // Return every field we are interested in
         Ok("test".to_string())
     }
-
 }
