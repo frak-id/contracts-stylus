@@ -1,6 +1,5 @@
 use alloc::{vec, vec::Vec};
-
-/// Import items from the SDK. The prelude contains common traits and macros.
+use core::marker::PhantomData;
 use stylus_sdk::{
     alloy_primitives::{Address, B128, U256, U64},
     alloy_sol_types::sol,
@@ -8,6 +7,8 @@ use stylus_sdk::{
     prelude::*,
     storage::{StorageMap, StorageU256, StorageU64},
 };
+
+pub trait UserConsumptionParams {}
 
 // Define events and errors in the contract
 sol! {
@@ -31,13 +32,14 @@ type UserConsumptionType = (U256, U256);
 
 // Define the global consumption contract
 #[solidity_storage]
-pub struct ConsumptionContract {
+pub struct ConsumptionContract<T: UserConsumptionParams> {
     // The user activity storage (user => plateform_id => UserConsumption)
     user_consumptions: StorageMap<Address, StorageMap<B128, UserConsumption>>,
+    phantom: PhantomData<T>,
 }
 
 /// Internal method stuff
-impl ConsumptionContract {
+impl<T: UserConsumptionParams> ConsumptionContract<T> {
     /// Update a user cosnumption by the given `added_consumption`
     fn _update_user_consumption(
         &mut self,
@@ -80,7 +82,7 @@ impl ConsumptionContract {
 
 /// External method stuff
 #[external]
-impl ConsumptionContract {
+impl<T: UserConsumptionParams> ConsumptionContract<T> {
     /* -------------------------------------------------------------------------- */
     /*                          Consumption read methods                          */
     /* -------------------------------------------------------------------------- */

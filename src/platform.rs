@@ -1,9 +1,7 @@
-use std::borrow::Borrow;
-
 use alloc::{string::String, vec, vec::Vec};
-/// Import items from the SDK. The prelude contains common traits and macros.
+use core::marker::PhantomData;
 use stylus_sdk::{
-    alloy_primitives::{Address, FixedBytes, B128, B256, U256},
+    alloy_primitives::{Address, FixedBytes, B128, U256},
     alloy_sol_types::sol,
     crypto::keccak,
     msg::{self},
@@ -14,6 +12,8 @@ use stylus_sdk::{
     },
 };
 
+pub trait PlateformParams {}
+
 // Define events and errors in the contract
 sol! {
     error NotPlateformOwner();
@@ -21,6 +21,7 @@ sol! {
     error InvalidPubKey();
     error InvalidMetadata();
 }
+
 #[derive(SolidityError)]
 pub enum PlateformError {
     NotPlateformOwner(NotPlateformOwner),
@@ -45,13 +46,14 @@ type PlatformMetadataType = (String, Address, FixedBytes<4>, FixedBytes<32>, [U2
 
 // Define the global conntract storage
 #[solidity_storage]
-pub struct PlateformContract {
+pub struct PlateformContract<T: PlateformParams> {
     // The plateform metadata storage (plateform_id => PlatformMetadata)
     platform_data: StorageMap<B128, PlatformMetadata>,
+    phantom: PhantomData<T>,
 }
 
 /// Internal method stuff
-impl PlateformContract {
+impl<T: PlateformParams> PlateformContract<T> {
     /// Check if a plateform exist
     fn _plateform_exist(&self, plateform_id: B128) -> bool {
         self.platform_data.get(plateform_id).owner.is_empty()
@@ -59,12 +61,12 @@ impl PlateformContract {
 
     /// Create a new plateform
     /// returns the created plateform_id
-    fn _create_plateform(
+    pub fn _create_plateform(
         &mut self,
         name: String,
         owner: Address,
-        content_type: [u8; 4],
-        origin: [u8; 32],
+        content_type: FixedBytes<4>,
+        origin: FixedBytes<32>,
         public_key: [U256; 4],
     ) -> Result<B128, PlateformError> {
         let plateform_id = B128::from_slice(keccak(origin).as_slice());
@@ -90,10 +92,8 @@ impl PlateformContract {
         // Create the new plateform metadata
         metadata.name.set_str(name);
         metadata.owner.set(owner);
-        metadata
-            .content_type
-            .set(FixedBytes::<4>::from(content_type));
-        metadata.origin.set(B256::from(origin));
+        metadata.content_type.set(content_type);
+        metadata.origin.set(origin);
         metadata.public_key.setter(0).unwrap().set(public_key[0]);
         metadata.public_key.setter(1).unwrap().set(public_key[1]);
         metadata.public_key.setter(2).unwrap().set(public_key[2]);
@@ -103,7 +103,7 @@ impl PlateformContract {
         Ok(plateform_id)
     }
 
-    /// Update a plateform name
+    /// Update a plateform metadata (could be name or owner)
     fn _update_plateform_metadata(
         &mut self,
         plateform_id: B128,
@@ -149,7 +149,7 @@ impl PlateformContract {
 
 /// External method stuff
 #[external]
-impl PlateformContract {
+impl<T: PlateformParams> PlateformContract<T> {
     /* -------------------------------------------------------------------------- */
     /*                          Plateform update methods                          */
     /* -------------------------------------------------------------------------- */
