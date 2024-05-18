@@ -1,7 +1,7 @@
 use alloc::{vec, vec::Vec};
 use core::marker::PhantomData;
 use stylus_sdk::{
-    alloy_primitives::{Address, B128, U256, U64},
+    alloy_primitives::{Address, FixedBytes, U256, U64},
     alloy_sol_types::sol,
     block::{self},
     prelude::*,
@@ -34,17 +34,17 @@ type UserConsumptionType = (U256, U256);
 #[solidity_storage]
 pub struct ConsumptionContract<T: UserConsumptionParams> {
     // The user activity storage (user => plateform_id => UserConsumption)
-    user_consumptions: StorageMap<Address, StorageMap<B128, UserConsumption>>,
+    user_consumptions: StorageMap<Address, StorageMap<FixedBytes<32>, UserConsumption>>,
     phantom: PhantomData<T>,
 }
 
 /// Internal method stuff
 impl<T: UserConsumptionParams> ConsumptionContract<T> {
     /// Update a user cosnumption by the given `added_consumption`
-    fn _update_user_consumption(
+    pub fn update_user_consumption(
         &mut self,
         user: Address,
-        plateform_id: B128,
+        plateform_id: FixedBytes<32>,
         added_consumption: U256,
     ) -> Result<(), ConsumptionError> {
         // Get the current state
@@ -92,7 +92,7 @@ impl<T: UserConsumptionParams> ConsumptionContract<T> {
     pub fn get_user_consumption(
         &self,
         user: Address,
-        plateform_id: B128,
+        plateform_id: FixedBytes<32>,
     ) -> Result<UserConsumptionType, Vec<u8>> {
         // Get the ptr to the plateform metadata
         let user_ptr = self.user_consumptions.get(user);
