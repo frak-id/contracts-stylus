@@ -1,13 +1,13 @@
 //! From: https://github.com/cygaar/inkmate/blob/main/contracts/src/utils/ecrecover.rs
-//! Direct import because it's not publicly exported from the inkmate repos
-//! Definitely need to do a PR to expose that
+//! Waiting for PR: https://github.com/cygaar/inkmate/pull/12
 
 use inkmate_common::crypto::ecrecover::{
-    EcRecoverTrait, EcdsaError, EC_RECOVER_ADDRESS_LAST_BYTE, EC_RECOVER_INPUT_LEN,
-    NUM_BYTES_ADDRESS, NUM_BYTES_U256,
+    EcdsaError, EC_RECOVER_ADDRESS_LAST_BYTE, EC_RECOVER_INPUT_LEN, NUM_BYTES_ADDRESS,
+    NUM_BYTES_U256,
 };
 use stylus_sdk::{alloy_primitives::Address, call::RawCall};
 
+pub use inkmate_common::crypto::ecrecover::EcRecoverTrait;
 pub struct PrecompileEcRecover;
 
 impl EcRecoverTrait for PrecompileEcRecover {

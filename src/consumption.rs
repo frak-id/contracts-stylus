@@ -48,13 +48,10 @@ impl<T: UserConsumptionParams> ConsumptionContract<T> {
         added_consumption: U256,
     ) -> Result<(), ConsumptionError> {
         // Get the current state
-        let mut user_consumption = self.user_consumptions.setter(user);
-        let mut plateform_user_consumption = user_consumption.setter(plateform_id);
-        let last_update = plateform_user_consumption
-            .update_timestamp
-            .get()
-            .to::<u64>();
-        let last_ccu = plateform_user_consumption.ccu.get();
+        let mut storage_ptr = self.user_consumptions.setter(user);
+        let mut storage_ptr = storage_ptr.setter(plateform_id);
+        let last_update = storage_ptr.update_timestamp.get().to::<u64>();
+        let last_ccu = storage_ptr.ccu.get();
 
         // Get the current timestamp
         let current_timestamp = block::timestamp();
@@ -67,11 +64,9 @@ impl<T: UserConsumptionParams> ConsumptionContract<T> {
         }
 
         // Update the ccu amount
-        plateform_user_consumption
-            .ccu
-            .set(last_ccu + added_consumption);
+        storage_ptr.ccu.set(last_ccu + added_consumption);
         // Update the update timestamp
-        plateform_user_consumption
+        storage_ptr
             .update_timestamp
             .set(U64::from(current_timestamp));
 
@@ -89,19 +84,20 @@ impl<T: UserConsumptionParams> ConsumptionContract<T> {
 
     /// Get the user consumption on a content
     #[selector(name = "getUserConsumption")]
+    #[view]
     pub fn get_user_consumption(
         &self,
         user: Address,
         plateform_id: FixedBytes<32>,
     ) -> Result<UserConsumptionType, Vec<u8>> {
         // Get the ptr to the plateform metadata
-        let user_ptr = self.user_consumptions.get(user);
-        let ptr = user_ptr.get(plateform_id);
+        let storage_ptr = self.user_consumptions.get(user);
+        let storage_ptr = storage_ptr.get(plateform_id);
         // Return every field we are interested in
         Ok((
             // CCU + update time
-            ptr.ccu.get(),
-            U256::from(ptr.update_timestamp.get()),
+            storage_ptr.ccu.get(),
+            U256::from(storage_ptr.update_timestamp.get()),
         ))
     }
 }

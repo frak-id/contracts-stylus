@@ -170,8 +170,8 @@ impl<T: PlateformParams> PlateformContract<T> {
     /* -------------------------------------------------------------------------- */
 
     /// Get a plateform metadatas
-    /// TODO: Pub key could be a B1024, should find a way to concat it to that type (but not aliased from the stylus SDK)
     #[selector(name = "getPlateformMetadatas")]
+    #[view]
     pub fn get_plateform_metadatas(
         &self,
         plateform_id: FixedBytes<32>,
