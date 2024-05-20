@@ -1,5 +1,6 @@
 //! Utilities for the deploy scripts.
 
+use std::fs::File;
 use std::{
     env, fs,
     path::PathBuf,
@@ -7,6 +8,7 @@ use std::{
     str::FromStr,
     sync::Arc,
 };
+use std::io::Read;
 
 use crate::constants::WASM_TARGET_TRIPLE;
 use ethers::{
@@ -16,6 +18,7 @@ use ethers::{
     signers::{LocalWallet, Signer},
     utils::get_contract_address,
 };
+use json::JsonValue;
 
 use crate::errors::ScriptError;
 
@@ -139,7 +142,7 @@ pub async fn deploy_stylus_contract(
     rpc_url: &str,
     priv_key: &str,
     client: Arc<LocalWalletHttpClient>,
-) -> Result<Address, ScriptError> {
+) -> Result<(), ScriptError> {
     // Get expected deployment address
     let deployer_address = client
         .default_sender()
@@ -165,5 +168,40 @@ pub async fn deploy_stylus_contract(
 
     command_success_or(deploy_cmd, "Failed to deploy Stylus contract")?;
 
-    Ok(deployed_address)
+    // Write the deployed address to the file
+    write_deployed_address("deployed.json", "consumption", deployed_address)?;
+
+    Ok(())
+}
+
+/// Writes the given address for the deployed contract
+pub fn write_deployed_address(
+    file_path: &str,
+    contract_key: &str,
+    address: Address,
+) -> Result<(), ScriptError> {
+    // If the file doesn't exist, create it
+    if !PathBuf::from(file_path).exists() {
+        fs::write(file_path, "{}").map_err(|e| ScriptError::JsonOutputError(e.to_string()))?;
+    }
+
+    // Read the current file contents
+    let mut file_contents = String::new();
+    File::open(file_path)
+        .map_err(|e| ScriptError::JsonOutputError(e.to_string()))?
+        .read_to_string(&mut file_contents)
+        .map_err(|e| ScriptError::JsonOutputError(e.to_string()))?;
+
+    // Parse it's json content into objects
+    let mut parsed_json =
+        json::parse(&file_contents).map_err(|e| ScriptError::JsonOutputError(e.to_string()))?;
+
+    // Update the contract address
+    parsed_json[contract_key] = JsonValue::String(format!("{address:#x}"));
+
+    // Write the updated json back to the file
+    fs::write(file_path, json::stringify_pretty(parsed_json, 4))
+        .map_err(|e| ScriptError::JsonOutputError(e.to_string()))?;
+
+    Ok(())
 }

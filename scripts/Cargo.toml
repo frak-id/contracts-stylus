@@ -7,10 +7,13 @@ homepage = "https://github.com/frak-id/contracts-stylus"
 repository = "https://github.com/frak-id/contracts-stylus"
 
 [dependencies]
-clap = { version = "4.4.7", features = ["derive"] }
+alloy-primitives = { workspace = true }
+alloy-sol-types = { workspace = true }
 tokio = { workspace = true }
 tracing = { workspace = true }
 ethers = { workspace = true }
 tracing-subscriber = { workspace = true }
+clap = { version = "4.4.7", features = ["derive"] }
+json = "0.12"
 
 
