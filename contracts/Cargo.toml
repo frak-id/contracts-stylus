@@ -1,0 +1,32 @@
+[package]
+name = "frak-contracts-stylus"
+version = "0.1.0"
+edition = "2021"
+license = "GNU-GPLv3"
+homepage = "https://github.com/frak-id/contracts-stylus"
+repository = "https://github.com/frak-id/contracts-stylus"
+keywords = ["arbitrum", "ethereum", "stylus", "frak"]
+description = "This repository houses the Rust implementation of the Content Consumption Tracker contract for the Arbitrum Stylus network"
+
+[dependencies]
+alloy-primitives = { workspace = true }
+alloy-sol-types = { workspace = true }
+mini-alloc = { workspace = true }
+stylus-sdk = { workspace = true }
+hex = { workspace = true }
+inkmate-common = "0.0.1"
+
+[features]
+export-abi = ["stylus-sdk/export-abi"]
+debug = ["stylus-sdk/debug"]
+
+[lib]
+crate-type = ["lib", "cdylib"]
+
+[profile.release]
+codegen-units = 1
+strip = true
+lto = true
+panic = "abort"
+opt-level = "s"
+
