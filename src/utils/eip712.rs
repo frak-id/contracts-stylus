@@ -54,6 +54,23 @@ impl<T: Eip712Params> Eip712<T> {
         keccak(digest_input)
     }
 
+    /// Get the current domain separator
+    /// Mutable since, if not cached, it could compute it and store it in cache
+    pub fn domain_separator(&mut self) -> Result<FixedBytes<32>, Eip712Error> {
+        // If the chain id is the same, return the cached domain separator
+        if block::chainid() == self.cached_chain_id.get().to::<u64>() {
+            Ok(self.cached_domain_separator.get())
+        } else {
+            // Otherwise, update it
+            let domain_separator = Eip712::<T>::compute_domain_separator();
+            // Updated cached infos
+            self.cached_chain_id.set(U64::from(block::chainid()));
+            self.cached_domain_separator.set(domain_separator);
+            // And read it
+            Ok(domain_separator)
+        }
+    }
+
     /// Recovery the typed data signer
     /// Mutable since, if domain separator not cached, it could recompute  it and store it in cache
     pub fn recover_typed_data_signer(
@@ -85,18 +102,7 @@ impl<T: Eip712Params> Eip712<T> {
 impl<T: Eip712Params> Eip712<T> {
     /// Get the current domain separator
     #[selector(name = "domainSeparator")]
-    pub fn domain_separator(&mut self) -> Result<FixedBytes<32>, Eip712Error> {
-        // If the chain id is the same, return the cached domain separator
-        if block::chainid() == self.cached_chain_id.get().to::<u64>() {
-            Ok(self.cached_domain_separator.get())
-        } else {
-            // Otherwise, update it
-            let domain_separator = Eip712::<T>::compute_domain_separator();
-            // Updated cached infos
-            self.cached_chain_id.set(U64::from(block::chainid()));
-            self.cached_domain_separator.set(domain_separator);
-            // And read it
-            Ok(domain_separator)
-        }
+    pub fn read_domain_separator(&self) -> Result<FixedBytes<32>, Eip712Error> {
+        Ok(Eip712::<T>::compute_domain_separator())
     }
 }

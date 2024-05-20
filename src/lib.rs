@@ -64,8 +64,16 @@ pub struct ContentConsumptionContract {
     consumption_nonce: StorageMap<FixedBytes<32>, StorageU256>,
 }
 
-// Private methods
-impl ContentConsumptionContract {}
+// Private helper methods
+impl ContentConsumptionContract {
+    /// Get the user to platform nonce key
+    fn user_to_platform_nonce_key(user: Address, platform_id: FixedBytes<32>) -> FixedBytes<32> {
+        let mut nonce_data = Vec::new();
+        nonce_data.extend_from_slice(&user[..]);
+        nonce_data.extend_from_slice(&platform_id[..]);
+        keccak256(nonce_data)
+    }
+}
 
 /// Declare that `ContentConsumptionContract` is a contract with the following external methods.
 #[external]
@@ -89,11 +97,19 @@ impl ContentConsumptionContract {
         Ok(())
     }
 
+    /// Get the current nonce for the given platform
+    #[selector(name = "getNonceForPlatform")]
+    pub fn get_nonce_for_platform(&self, user: Address, platform_id: FixedBytes<32>) -> U256 {
+        self.consumption_nonce
+            .get(Self::user_to_platform_nonce_key(user, platform_id))
+    }
+
     /* -------------------------------------------------------------------------- */
     /*                                  CCU push                                  */
     /* -------------------------------------------------------------------------- */
 
     /// Push a new consumption for a given platform
+    #[selector(name = "pushCcu")]
     pub fn push_ccu(
         &mut self,
         user: Address,
@@ -105,12 +121,7 @@ impl ContentConsumptionContract {
         s: FixedBytes<32>,
     ) -> Result<(), Vec<u8>> {
         // Get the user consumption nonce
-        let mut nonce_data = Vec::new();
-        nonce_data.extend_from_slice(&user[..]);
-        nonce_data.extend_from_slice(&platform_id[..]);
-        let nonce_key = keccak256(nonce_data);
-
-        // Get the current nonce
+        let nonce_key = Self::user_to_platform_nonce_key(user, platform_id);
         let current_nonce = self.consumption_nonce.get(nonce_key);
 
         // Ensure that the caller is the owner of the platform
