@@ -1,5 +1,6 @@
 //! Definitions of CLI arguments and commands for deploy scripts
 
+use crate::commands::deploy_contracts;
 use crate::errors::ScriptError;
 use crate::utils::LocalWalletHttpClient;
 use clap::{Args, Parser, Subcommand};
@@ -35,14 +36,16 @@ impl Command {
     /// Run the command
     pub async fn run(
         self,
-        _client: Arc<LocalWalletHttpClient>,
-        _rpc_url: &str,
-        _priv_key: &str,
+        client: Arc<LocalWalletHttpClient>,
+        rpc_url: &str,
+        priv_key: &str,
     ) -> Result<(), ScriptError> {
         match self {
-            Command::DeployContracts(_args) => {
+            Command::DeployContracts(args) => {
                 info!("Deploying contracts...");
                 // TODO: Do some shit here
+                deploy_contracts(args, rpc_url, priv_key, client).await?;
+
                 Ok(())
             }
             Command::CreatePlatform(_args) => {
