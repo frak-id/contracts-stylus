@@ -3,11 +3,7 @@
 
 use core::marker::PhantomData;
 use stylus_sdk::{
-    alloy_primitives::Address,
-    alloy_sol_types::sol,
-    evm, msg,
-    prelude::*,
-    storage::StorageAddress,
+    alloy_primitives::Address, alloy_sol_types::sol, evm, msg, prelude::*, storage::StorageAddress,
 };
 
 pub trait OwnedParams {}

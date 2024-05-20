@@ -12,14 +12,14 @@ pub trait UserConsumptionParams {}
 
 // Define events and errors in the contract
 sol! {
-    error TooCloseConsumptiom();
+    error TooCloseConsumption();
 }
 #[derive(SolidityError)]
 pub enum ConsumptionError {
-    TooCloseConsumptiom(TooCloseConsumptiom),
+    TooCloseConsumption(TooCloseConsumption),
 }
 
-/// Define the user consumption data on the given plateform
+/// Define the user consumption data on the given platform
 #[solidity_storage]
 pub struct UserConsumption {
     ccu: StorageU256,
@@ -33,7 +33,7 @@ type UserConsumptionType = (U256, U256);
 // Define the global consumption contract
 #[solidity_storage]
 pub struct ConsumptionContract<T: UserConsumptionParams> {
-    // The user activity storage (user => plateform_id => UserConsumption)
+    // The user activity storage (user => platform_id => UserConsumption)
     user_consumptions: StorageMap<Address, StorageMap<FixedBytes<32>, UserConsumption>>,
     phantom: PhantomData<T>,
 }
@@ -44,12 +44,12 @@ impl<T: UserConsumptionParams> ConsumptionContract<T> {
     pub fn update_user_consumption(
         &mut self,
         user: Address,
-        plateform_id: FixedBytes<32>,
+        platform_id: FixedBytes<32>,
         added_consumption: U256,
     ) -> Result<(), ConsumptionError> {
         // Get the current state
         let mut storage_ptr = self.user_consumptions.setter(user);
-        let mut storage_ptr = storage_ptr.setter(plateform_id);
+        let mut storage_ptr = storage_ptr.setter(platform_id);
         let last_update = storage_ptr.update_timestamp.get().to::<u64>();
         let last_ccu = storage_ptr.ccu.get();
 
@@ -58,8 +58,8 @@ impl<T: UserConsumptionParams> ConsumptionContract<T> {
 
         // If last update was less than one minute ago, abort
         if (last_update + 60) > current_timestamp {
-            return Err(ConsumptionError::TooCloseConsumptiom(
-                TooCloseConsumptiom {},
+            return Err(ConsumptionError::TooCloseConsumption(
+                TooCloseConsumption {},
             ));
         }
 
@@ -88,11 +88,11 @@ impl<T: UserConsumptionParams> ConsumptionContract<T> {
     pub fn get_user_consumption(
         &self,
         user: Address,
-        plateform_id: FixedBytes<32>,
+        platform_id: FixedBytes<32>,
     ) -> Result<UserConsumptionType, Vec<u8>> {
-        // Get the ptr to the plateform metadata
+        // Get the ptr to the platform metadata
         let storage_ptr = self.user_consumptions.get(user);
-        let storage_ptr = storage_ptr.get(plateform_id);
+        let storage_ptr = storage_ptr.get(platform_id);
         // Return every field we are interested in
         Ok((
             // CCU + update time

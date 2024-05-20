@@ -9,25 +9,25 @@ use stylus_sdk::{
     storage::{StorageAddress, StorageB256, StorageB32, StorageMap, StorageString},
 };
 
-pub trait PlateformParams {}
+pub trait PlatformParams {}
 
 // Define events and errors in the contract
 sol! {
-    error NotPlateformOwner();
-    error PlateformAlreadyExist();
-    error InexistantPlateform();
+    error NotPlatformOwner();
+    error PlatformAlreadyExist();
+    error PlatformDontExist();
     error InvalidMetadata();
 }
 
 #[derive(SolidityError)]
-pub enum PlateformError {
-    NotPlateformOwner(NotPlateformOwner),
-    PlateformAlreadyExist(PlateformAlreadyExist),
-    InexistantPlateform(InexistantPlateform),
+pub enum PlatformError {
+    NotPlatformOwner(NotPlatformOwner),
+    PlatformAlreadyExist(PlatformAlreadyExist),
+    PlatformDontExist(PlatformDontExist),
     InvalidMetadata(InvalidMetadata),
 }
 
-/// Define the palteform metadata
+/// Define the platform metadata
 #[solidity_storage]
 pub struct PlatformMetadata {
     name: StorageString,
@@ -36,103 +36,98 @@ pub struct PlatformMetadata {
     origin: StorageB256,
 }
 
-/// Define the type of the plateform metadata, in an ideal world, it should be a sol type
+/// Define the type of the platform metadata, in an ideal world, it should be a sol type
 /// TODO: When alloy-rs is updated on the stylus SDK, use a sol! macro to define the type
 type PlatformMetadataType = (String, Address, FixedBytes<4>, FixedBytes<32>);
 
 // Define the global conntract storage
 #[solidity_storage]
-pub struct PlateformContract<T: PlateformParams> {
-    // The plateform metadata storage (plateform_id => PlatformMetadata)
+pub struct PlatformContract<T: PlatformParams> {
+    // The platform metadata storage (platform_id => PlatformMetadata)
     platform_data: StorageMap<FixedBytes<32>, PlatformMetadata>,
     phantom: PhantomData<T>,
 }
 
 /// Internal method stuff
-impl<T: PlateformParams> PlateformContract<T> {
+impl<T: PlatformParams> PlatformContract<T> {
     /* -------------------------------------------------------------------------- */
     /*                                   Helpers                                  */
     /* -------------------------------------------------------------------------- */
 
-    /// Check if a plateform exist
-    fn _plateform_exist(&self, plateform_id: FixedBytes<32>) -> bool {
-        self.platform_data.get(plateform_id).owner.is_empty()
+    /// Check if a platform exist
+    fn _platform_exist(&self, platform_id: FixedBytes<32>) -> bool {
+        self.platform_data.get(platform_id).owner.is_empty()
     }
 
-    /// Only allow the call for an existing plateform
-    pub fn only_existing_plateform(
-        &self,
-        plateform_id: FixedBytes<32>,
-    ) -> Result<(), PlateformError> {
-        if !self._plateform_exist(plateform_id) {
-            return Err(PlateformError::InexistantPlateform(InexistantPlateform {}));
+    /// Only allow the call for an existing platform
+    pub fn only_existing_platform(&self, platform_id: FixedBytes<32>) -> Result<(), PlatformError> {
+        if !self._platform_exist(platform_id) {
+            return Err(PlatformError::PlatformDontExist(PlatformDontExist {}));
         }
         Ok(())
     }
 
-    /// Get the plateform owner
-    pub fn get_plateform_owner(
+    /// Get the platform owner
+    pub fn get_platform_owner(
         &self,
-        plateform_id: FixedBytes<32>,
-    ) -> Result<Address, PlateformError> {
-        self.only_existing_plateform(plateform_id)?;
-        Ok(self.platform_data.get(plateform_id).owner.get())
+        platform_id: FixedBytes<32>,
+    ) -> Result<Address, PlatformError> {
+        self.only_existing_platform(platform_id)?;
+        Ok(self.platform_data.get(platform_id).owner.get())
     }
 
     /* -------------------------------------------------------------------------- */
-    /*                         Palteform creation / update                        */
+    /*                         Platform  creation / update                        */
     /* -------------------------------------------------------------------------- */
 
-    /// Create a new plateform
-    /// returns the created plateform_id
-    pub fn _create_plateform(
+    /// Create a new platform
+    /// returns the created platform_id
+    pub fn _create_platform(
         &mut self,
         name: String,
         owner: Address,
         content_type: FixedBytes<4>,
         origin: FixedBytes<32>,
-    ) -> Result<FixedBytes<32>, PlateformError> {
-        let plateform_id = keccak(origin);
-        // Ensure the plateform doesn't already exist
-        if self._plateform_exist(plateform_id) {
-            return Err(PlateformError::PlateformAlreadyExist(
-                PlateformAlreadyExist {},
-            ));
+    ) -> Result<FixedBytes<32>, PlatformError> {
+        let platform_id = keccak(origin);
+        // Ensure the platform doesn't already exist
+        if self._platform_exist(platform_id) {
+            return Err(PlatformError::PlatformAlreadyExist(PlatformAlreadyExist {}));
         }
 
         // Ensure name and owner aren't empty
         if name.is_empty() | owner.is_zero() {
-            return Err(PlateformError::InvalidMetadata(InvalidMetadata {}));
+            return Err(PlatformError::InvalidMetadata(InvalidMetadata {}));
         }
 
         // Get the right metadata setter
-        let mut metadata = self.platform_data.setter(plateform_id);
-        // Create the new plateform metadata
+        let mut metadata = self.platform_data.setter(platform_id);
+        // Create the new platform metadata
         metadata.name.set_str(name);
         metadata.owner.set(owner);
         metadata.content_type.set(content_type);
         metadata.origin.set(origin);
 
-        // Return the created plateform_id
-        Ok(plateform_id)
+        // Return the created platform_id
+        Ok(platform_id)
     }
 
-    /// Update a plateform metadata (could be name or owner)
-    fn _update_plateform_metadata(
+    /// Update a platform metadata (could be name or owner)
+    fn _update_platform_metadata(
         &mut self,
-        plateform_id: FixedBytes<32>,
+        platform_id: FixedBytes<32>,
         name: String,
         owner: Address,
-    ) -> Result<(), PlateformError> {
-        self.only_existing_plateform(plateform_id)?;
+    ) -> Result<(), PlatformError> {
+        self.only_existing_platform(platform_id)?;
 
         // Ensure name isn't empty
         if name.is_empty() | owner.is_zero() {
-            return Err(PlateformError::InvalidMetadata(InvalidMetadata {}));
+            return Err(PlatformError::InvalidMetadata(InvalidMetadata {}));
         }
         // Get the right metadata setter
-        let mut metadata = self.platform_data.setter(plateform_id);
-        // Create the new plateform metadata
+        let mut metadata = self.platform_data.setter(platform_id);
+        // Create the new platform metadata
         metadata.name.set_str(name);
         metadata.owner.set(owner);
         // Return success
@@ -142,45 +137,45 @@ impl<T: PlateformParams> PlateformContract<T> {
 
 /// External method stuff
 #[external]
-impl<T: PlateformParams> PlateformContract<T> {
+impl<T: PlatformParams> PlatformContract<T> {
     /* -------------------------------------------------------------------------- */
-    /*                          Plateform update methods                          */
+    /*                          Platform update methods                           */
     /* -------------------------------------------------------------------------- */
 
-    /// Update the plateform metadatas
-    #[selector(name = "updatePlateformMetadatas")]
-    pub fn update_metadatas(
+    /// Update the platform metadata
+    #[selector(name = "updatePlatformMetadata")]
+    pub fn update_metadata(
         &mut self,
-        plateform_id: FixedBytes<32>,
+        platform_id: FixedBytes<32>,
         name: String,
         owner: Address,
-    ) -> Result<(), PlateformError> {
+    ) -> Result<(), PlatformError> {
         let caller = msg::sender();
         // Ensure the caller is the owner
-        if !self.platform_data.get(plateform_id).owner.get().eq(&caller) {
-            return Err(PlateformError::NotPlateformOwner(NotPlateformOwner {}));
+        if !self.platform_data.get(platform_id).owner.get().eq(&caller) {
+            return Err(PlatformError::NotPlatformOwner(NotPlatformOwner {}));
         }
 
-        // Update the plateform metadatas
-        self._update_plateform_metadata(plateform_id, name, owner)
+        // Update the platform metadata
+        self._update_platform_metadata(platform_id, name, owner)
     }
 
     /* -------------------------------------------------------------------------- */
-    /*                           Plateform read methods                           */
+    /*                           Platform read methods                            */
     /* -------------------------------------------------------------------------- */
 
-    /// Get a plateform metadatas
-    #[selector(name = "getPlateformMetadatas")]
+    /// Get a platform metadata
+    #[selector(name = "getPlatformMetadata")]
     #[view]
-    pub fn get_plateform_metadatas(
+    pub fn get_platform_metadata(
         &self,
-        plateform_id: FixedBytes<32>,
+        platform_id: FixedBytes<32>,
     ) -> Result<PlatformMetadataType, Vec<u8>> {
-        // Get the ptr to the plateform metadata
-        let ptr = self.platform_data.get(plateform_id);
+        // Get the ptr to the platform metadata
+        let ptr = self.platform_data.get(platform_id);
         // Return every field we are interested in
         Ok((
-            // Classical metadatas
+            // Classical metadata
             ptr.name.get_string(),
             ptr.owner.get(),
             ptr.content_type.get(),

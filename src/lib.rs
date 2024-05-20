@@ -6,11 +6,13 @@ extern crate alloc;
 #[global_allocator]
 static ALLOC: mini_alloc::MiniAlloc = mini_alloc::MiniAlloc::INIT;
 use alloc::vec;
+use alloy_primitives::keccak256;
 use stylus_sdk::{
     alloy_primitives::{Address, FixedBytes, U256},
     alloy_sol_types::sol,
     crypto::keccak,
     prelude::*,
+    storage::{StorageMap, StorageU256},
 };
 
 // Utility functions and helpers used across the library
@@ -19,7 +21,7 @@ mod platform;
 mod utils;
 
 use consumption::{ConsumptionContract, UserConsumptionParams};
-use platform::{PlateformContract, PlateformParams};
+use platform::{PlatformContract, PlatformParams};
 use utils::{
     eip712::{Eip712, Eip712Params},
     owned::{Owned, OwnedParams},
@@ -27,17 +29,17 @@ use utils::{
 
 // Define events and errors in the contract
 sol! {
-    error InvalidPlateformSignature();
+    error InvalidPlatformSignature();
 }
 #[derive(SolidityError)]
 pub enum ContentConsumptionError {
-    InvalidPlateformSignature(InvalidPlateformSignature),
+    InvalidPlatformSignature(InvalidPlatformSignature),
 }
 
 struct CoreParam;
 
 impl OwnedParams for CoreParam {}
-impl PlateformParams for CoreParam {}
+impl PlatformParams for CoreParam {}
 impl UserConsumptionParams for CoreParam {}
 impl Eip712Params for CoreParam {
     // Static fields
@@ -49,14 +51,17 @@ impl Eip712Params for CoreParam {
 #[solidity_storage]
 #[entrypoint]
 pub struct ContentConsumptionContract {
+    // All the inhereted contracts
     #[borrow]
-    plateform: PlateformContract<CoreParam>,
+    platform: PlatformContract<CoreParam>,
     #[borrow]
     consumption: ConsumptionContract<CoreParam>,
     #[borrow]
     eip712: Eip712<CoreParam>,
     #[borrow]
     owned: Owned<CoreParam>,
+    // The consumption nonce for each users
+    consumption_nonce: StorageMap<FixedBytes<32>, StorageU256>,
 }
 
 // Private methods
@@ -64,7 +69,7 @@ impl ContentConsumptionContract {}
 
 /// Declare that `ContentConsumptionContract` is a contract with the following external methods.
 #[external]
-#[inherit(PlateformContract<CoreParam>, ConsumptionContract<CoreParam>, Owned<CoreParam>, Eip712<CoreParam>)]
+#[inherit(PlatformContract<CoreParam>, ConsumptionContract<CoreParam>, Owned<CoreParam>, Eip712<CoreParam>)]
 impl ContentConsumptionContract {
     /* -------------------------------------------------------------------------- */
     /*                                 Constructor                                */
@@ -88,61 +93,73 @@ impl ContentConsumptionContract {
     /*                                  CCU push                                  */
     /* -------------------------------------------------------------------------- */
 
-    /// Push a new consumption for a given plateform
+    /// Push a new consumption for a given platform
     pub fn push_ccu(
         &mut self,
         user: Address,
-        plateform_id: FixedBytes<32>,
+        platform_id: FixedBytes<32>,
         added_consumption: U256,
         deadline: U256,
         v: u8,
         r: FixedBytes<32>,
         s: FixedBytes<32>,
     ) -> Result<(), Vec<u8>> {
-        // Ensure that the caller is the owner of the plateform
-        let plateform_owner = self.plateform.get_plateform_owner(plateform_id)?;
+        // Get the user consumption nonce
+        let mut nonce_data = Vec::new();
+        nonce_data.extend_from_slice(&user[..]);
+        nonce_data.extend_from_slice(&platform_id[..]);
+        let nonce_key = keccak256(nonce_data);
+
+        // Get the current nonce
+        let current_nonce = self.consumption_nonce.get(nonce_key);
+
+        // Ensure that the caller is the owner of the platform
+        let platform_owner = self.platform.get_platform_owner(platform_id)?;
 
         // Rebuild the signed data
-        // TODO: Should laos have:
-        // - deadline
-        // - plateform_origin (to ensure the plateform is the right one)
+        // TODO: Should also have:
         // - content_type (to ensure the content is the right one)
-        // - nonce for user+plateform
+        // Could we switch to a vector here to ease the manipulation?
         let mut struct_hash = [0u8; 192];
-        struct_hash[0..32].copy_from_slice(&keccak(b"ValidateConsumption(address user,bytes32 plateformId,uint256 addedConsumption,uint256 deadline)")[..]);
+        struct_hash[..32].copy_from_slice(&keccak(b"ValidateConsumption(address user,bytes32 platformId,uint256 addedConsumption,uint256 nonce,uint256 deadline)")[..]);
         struct_hash[32..64].copy_from_slice(&user[..]);
-        struct_hash[64..96].copy_from_slice(&plateform_id[..]);
+        struct_hash[64..96].copy_from_slice(&platform_id[..]);
         struct_hash[96..128].copy_from_slice(&added_consumption.to_be_bytes_vec()[..]);
-        struct_hash[128..160].copy_from_slice(&deadline.to_be_bytes_vec()[..]);
+        struct_hash[128..160].copy_from_slice(&current_nonce.to_be_bytes_vec()[..]);
+        struct_hash[160..192].copy_from_slice(&deadline.to_be_bytes_vec()[..]);
 
         // Do an ecdsa recovery check on the signature
         let recovered_address = self
             .eip712
             .recover_typed_data_signer(&struct_hash, v, r, s)?;
 
-        // Ensure the plateform owner has signed the consumption
-        if recovered_address.is_zero() || recovered_address != plateform_owner {
-            return Err(ContentConsumptionError::InvalidPlateformSignature(
-                InvalidPlateformSignature {},
+        // Ensure the platform owner has signed the consumption
+        if recovered_address.is_zero() || recovered_address != platform_owner {
+            return Err(ContentConsumptionError::InvalidPlatformSignature(
+                InvalidPlatformSignature {},
             )
             .into());
         }
 
+        // Increase current nonce
+        self.consumption_nonce
+            .insert(nonce_key, current_nonce + U256::from(1));
+
         // Push the new CCU
         self.consumption
-            .update_user_consumption(user, plateform_id, added_consumption)?;
+            .update_user_consumption(user, platform_id, added_consumption)?;
 
         // Return the success
         Ok(())
     }
 
     /* -------------------------------------------------------------------------- */
-    /*                           Register new plateform                           */
+    /*                           Register new platform                            */
     /* -------------------------------------------------------------------------- */
 
-    /// Register a new plateform (only callable by the owner)
-    #[selector(name = "registerPalteform")]
-    pub fn register_plateform(
+    /// Register a new platform (only callable by the owner)
+    #[selector(name = "registerPaltform")]
+    pub fn register_platform(
         &mut self,
         name: String,
         owner: Address,
@@ -152,17 +169,17 @@ impl ContentConsumptionContract {
         // Ensure that the caller is the owner
         self.owned.only_owner()?;
 
-        // Create the plateform
-        let plateform_id = self
-            .plateform
-            ._create_plateform(name, owner, content_type, origin)?;
+        // Create the platform
+        let platform_id = self
+            .platform
+            ._create_platform(name, owner, content_type, origin)?;
 
-        // Return the success and the created plateform id
-        Ok(plateform_id)
+        // Return the success and the created platform id
+        Ok(platform_id)
     }
 
     /*
      * TODO: -> Option to handle CCU
-     *  -> Pushing new CCU should receive base CCU data (new amount), and check against a BLS signature if the owner of the plateform allowed it
+     *  -> Pushing new CCU should receive base CCU data (new amount), and check against a BLS signature if the owner of the platform allowed it
      */
 }
