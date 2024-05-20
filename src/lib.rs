@@ -23,7 +23,6 @@ use platform::{PlateformContract, PlateformParams};
 use utils::{
     eip712::{Eip712, Eip712Params},
     owned::{Owned, OwnedParams},
-    signature::{EcRecoverTrait, PrecompileEcRecover},
 };
 
 // Define events and errors in the contract
@@ -44,10 +43,6 @@ impl Eip712Params for CoreParam {
     // Static fields
     const NAME: &'static str = "ContentConsumption";
     const VERSION: &'static str = "0.0.1";
-
-    // TODO: This fields should be computed, and place in the EIP712 storage, computed with an init method
-    const INITIAL_CHAIN_ID: u64 = 1;
-    const INITIAL_DOMAIN_SEPARATOR: FixedBytes<32> = FixedBytes::<32>([0; 32]);
 }
 
 // Define the global conntract storage
@@ -80,6 +75,8 @@ impl ContentConsumptionContract {
     /// See: https://github.com/OffchainLabs/stylus-sdk-rs/issues/99
     #[selector(name = "initialize")]
     pub fn initialize(&mut self, owner: Address) -> Result<(), Vec<u8>> {
+        // Init the eip712 domain
+        self.eip712.initialize();
         // Init the contract with the given owner
         self.owned.initialize(owner)?;
 
@@ -106,7 +103,11 @@ impl ContentConsumptionContract {
         let plateform_owner = self.plateform.get_plateform_owner(plateform_id)?;
 
         // Rebuild the signed data
-        // TODO: Should include more stuff here
+        // TODO: Should laos have:
+        // - deadline
+        // - plateform_origin (to ensure the plateform is the right one)
+        // - content_type (to ensure the content is the right one)
+        // - nonce for user+plateform
         let mut struct_hash = [0u8; 192];
         struct_hash[0..32].copy_from_slice(&keccak(b"ValidateConsumption(address user,bytes32 plateformId,uint256 addedConsumption,uint256 deadline)")[..]);
         struct_hash[32..64].copy_from_slice(&user[..]);
@@ -114,21 +115,10 @@ impl ContentConsumptionContract {
         struct_hash[96..128].copy_from_slice(&added_consumption.to_be_bytes_vec()[..]);
         struct_hash[128..160].copy_from_slice(&deadline.to_be_bytes_vec()[..]);
 
-        // Rebuild the digest input
-        let mut digest_input = [0u8; 2 + 32 + 32];
-        digest_input[0] = 0x19;
-        digest_input[1] = 0x01;
-        digest_input[2..34].copy_from_slice(&self.eip712.domain_separator()?[..]);
-        digest_input[34..66].copy_from_slice(&keccak(struct_hash)[..]);
-
-        // TODO: Perform a ecdsa signature verification from the owner
-        let recovered_address = Address::from_slice(
-            &PrecompileEcRecover::ecrecover(&keccak(digest_input), v, &r.0, &s.0).map_err(
-                |_| {
-                    ContentConsumptionError::InvalidPlateformSignature(InvalidPlateformSignature {})
-                },
-            )?,
-        );
+        // Do an ecdsa recovery check on the signature
+        let recovered_address = self
+            .eip712
+            .recover_typed_data_signer(&struct_hash, v, r, s)?;
 
         // Ensure the plateform owner has signed the consumption
         if recovered_address.is_zero() || recovered_address != plateform_owner {

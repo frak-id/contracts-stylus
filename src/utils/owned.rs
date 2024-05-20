@@ -1,19 +1,16 @@
 //! From: https://github.com/cairoeth/rustmate/blob/main/src/auth/owned.rs
 //! Slight adaptation to use latest stylus version, and to have better errors
 
-use alloy_primitives::Address;
 use core::marker::PhantomData;
-use stylus_sdk::{alloy_sol_types::sol, evm, msg, prelude::*};
+use stylus_sdk::{
+    alloy_primitives::Address,
+    alloy_sol_types::sol,
+    evm, msg,
+    prelude::*,
+    storage::StorageAddress,
+};
 
 pub trait OwnedParams {}
-
-sol_storage! {
-    pub struct Owned<T: OwnedParams> {
-        address owner;
-        bool initialized;
-        PhantomData<T> phantom;
-    }
-}
 
 // Declare events and Solidity error types
 sol! {
@@ -32,11 +29,19 @@ pub enum OwnedError {
     InvalidInitialize(InvalidInitialize),
 }
 
+// Define the global owned contract storage
+#[solidity_storage]
+pub struct Owned<T: OwnedParams> {
+    // The owner of the contract
+    owner: StorageAddress,
+    phantom: PhantomData<T>,
+}
+
 impl<T: OwnedParams> Owned<T> {
     /// Initialize the contract with an owner.
     pub fn initialize(&mut self, _owner: Address) -> Result<(), OwnedError> {
         // Ensure that the contract has not been initialized
-        if self.initialized.get() {
+        if !self.owner.get().is_empty() {
             return Err(OwnedError::AlreadyInitialized(AlreadyInitialized {}));
         }
 

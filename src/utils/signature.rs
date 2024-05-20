@@ -7,7 +7,9 @@ use inkmate_common::crypto::ecrecover::{
 };
 use stylus_sdk::{alloy_primitives::Address, call::RawCall};
 
+// Re-export the EcRecoverTrait and implement it for the PrecompileEcRecover struct
 pub use inkmate_common::crypto::ecrecover::EcRecoverTrait;
+
 pub struct PrecompileEcRecover;
 
 impl EcRecoverTrait for PrecompileEcRecover {
