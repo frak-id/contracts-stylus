@@ -26,6 +26,10 @@ This contract is being developed in Rust, tailored for the Arbitrum Stylus WASM 
 
 Consumption Tracker contract deployed on stylus testnet v2 at [0xcedf49740cf7f008981e9e0dc44798bc53dec299](`https://stylusv2-explorer.arbitrum.io/address/0xcedf49740cf7f008981e9e0dc44798bc53dec299`)
 
+**Deployment Script**
+
+Hugely inspired from [Renegade-fi](https://github.com/renegade-fi/renegade-contracts/tree/main/scripts) stylus scripts.
+
 **Contributing**
 
 We welcome contributions to this project. Feel free to open an issue or submit a pull request.
