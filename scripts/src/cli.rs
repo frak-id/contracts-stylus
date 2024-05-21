@@ -2,9 +2,8 @@
 
 use crate::commands::deploy_contracts;
 use crate::errors::ScriptError;
-use crate::utils::LocalWalletHttpClient;
+use crate::utils::RpcProvider;
 use clap::{Args, Parser, Subcommand};
-use std::sync::Arc;
 use tracing::info;
 
 /// Scripts for deploying & upgrading the Renegade Stylus contracts
@@ -36,7 +35,7 @@ impl Command {
     /// Run the command
     pub async fn run(
         self,
-        client: Arc<LocalWalletHttpClient>,
+        client: RpcProvider,
         rpc_url: &str,
         priv_key: &str,
     ) -> Result<(), ScriptError> {

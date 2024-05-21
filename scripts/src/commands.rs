@@ -1,11 +1,10 @@
 use crate::abi::initializeCall;
 use crate::cli::DeployContractsArgs;
 use crate::errors::ScriptError;
-use crate::utils::{build_stylus_contract, deploy_stylus_contract, LocalWalletHttpClient};
+use crate::utils::{build_stylus_contract, deploy_stylus_contract, RpcProvider};
+use alloy_primitives::hex::ToHexExt;
 use alloy_primitives::Address;
 use alloy_sol_types::SolCall;
-use std::sync::Arc;
-use ethers::abi::AbiEncode;
 use tracing::info;
 
 /// Deploy the Frak consumption contracts
@@ -13,7 +12,7 @@ pub async fn deploy_contracts(
     args: DeployContractsArgs,
     rpc_url: &str,
     priv_key: &str,
-    client: Arc<LocalWalletHttpClient>,
+    client: RpcProvider,
 ) -> Result<(), ScriptError> {
     // Build the contracts
     info!("Building contracts...");
@@ -22,7 +21,7 @@ pub async fn deploy_contracts(
 
     // Deploy them
     info!("Deploying contracts...");
-    let address = deploy_stylus_contract(wasm_file_path, rpc_url, priv_key, client.clone()).await?;
+    deploy_stylus_contract(wasm_file_path, rpc_url, priv_key, client).await?;
     info!("Deployed with success");
 
     // Perform the init call

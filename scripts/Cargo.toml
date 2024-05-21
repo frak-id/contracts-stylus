@@ -9,11 +9,19 @@ repository = "https://github.com/frak-id/contracts-stylus"
 [dependencies]
 alloy-primitives = { workspace = true }
 alloy-sol-types = { workspace = true }
+alloy-signer = { git = "https://github.com/alloy-rs/alloy", rev = "77458dd" }
+alloy-signer-wallet = { git = "https://github.com/alloy-rs/alloy", rev = "77458dd" }
+alloy-rpc-client = { git = "https://github.com/alloy-rs/alloy", rev = "77458dd" }
+alloy-transport = { git = "https://github.com/alloy-rs/alloy", rev = "77458dd" }
+alloy-transport-http = { git = "https://github.com/alloy-rs/alloy", rev = "77458dd" }
+alloy-provider = { git = "https://github.com/alloy-rs/alloy", rev = "77458dd" }
+alloy-network = { git = "https://github.com/alloy-rs/alloy", rev = "77458dd" }
+alloy-rlp = { git = "https://github.com/alloy-rs/rlp", rev = "b070e82" }
 tokio = { workspace = true }
 tracing = { workspace = true }
-ethers = { workspace = true }
 tracing-subscriber = { workspace = true }
 clap = { version = "4.4.7", features = ["derive"] }
 json = "0.12"
+reqwest = "0.12.4"
 
 

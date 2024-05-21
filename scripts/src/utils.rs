@@ -1,56 +1,69 @@
 //! Utilities for the deploy scripts.
 
+use alloy_network::{Ethereum, EthereumSigner};
+use alloy_primitives::Address;
+use alloy_provider::fillers::{
+    ChainIdFiller, FillProvider, GasFiller, JoinFill, NonceFiller, SignerFiller,
+};
+use alloy_provider::{Identity, Provider, ProviderBuilder, ReqwestProvider, WalletProvider};
+use alloy_signer::k256::ecdsa::SigningKey;
 use std::fs::File;
+use std::io::Read;
 use std::{
     env, fs,
     path::PathBuf,
     process::{Command, Stdio},
-    str::FromStr,
-    sync::Arc,
 };
-use std::io::Read;
 
 use crate::constants::WASM_TARGET_TRIPLE;
-use ethers::{
-    abi::Address,
-    middleware::SignerMiddleware,
-    providers::{Http, Middleware, Provider},
-    signers::{LocalWallet, Signer},
-    utils::get_contract_address,
-};
+use alloy_signer_wallet::Wallet;
 use json::JsonValue;
+use reqwest::{Client, Url};
+use tracing::info;
 
 use crate::errors::ScriptError;
 
+/// Re-export from alloy recommend filter
+type RecommendFiller =
+    JoinFill<JoinFill<JoinFill<Identity, GasFiller>, NonceFiller>, ChainIdFiller>;
+
 /// An Ethers provider that uses a `LocalWallet` to generate signatures
 /// & interfaces with the RPC endpoint over HTTP
-pub type LocalWalletHttpClient = SignerMiddleware<Provider<Http>, LocalWallet>;
+pub type RpcProvider = FillProvider<
+    JoinFill<RecommendFiller, SignerFiller<EthereumSigner>>,
+    ReqwestProvider,
+    alloy_transport_http::Http<Client>,
+    Ethereum,
+>;
 
 /// Sets up the address and client with which to instantiate a contract for testing,
 /// reading in the private key, RPC url, and contract address from the environment.
-pub async fn setup_client(
-    priv_key: &str,
-    rpc_url: &str,
-) -> Result<Arc<LocalWalletHttpClient>, ScriptError> {
-    let provider = Provider::<Http>::try_from(rpc_url)
+pub async fn setup_client(priv_key: &str, rpc_url: &str) -> Result<RpcProvider, ScriptError> {
+    // Create our signer
+    let signer = priv_key
+        .parse::<Wallet<SigningKey>>()
         .map_err(|e| ScriptError::ClientInitialization(e.to_string()))?;
 
-    // Create the wallet from priv key
-    let wallet = LocalWallet::from_str(priv_key)
-        .map_err(|e| ScriptError::ClientInitialization(e.to_string()))?;
+    // Create our provider with the rpc client + signer
+    let provider: FillProvider<
+        JoinFill<RecommendFiller, SignerFiller<EthereumSigner>>,
+        ReqwestProvider,
+        alloy_transport_http::Http<Client>,
+        Ethereum,
+    > = ProviderBuilder::new()
+        .with_recommended_fillers()
+        .signer(EthereumSigner::from(signer))
+        .on_http(rpc_url.parse::<Url>().unwrap());
+
     // Fetch chain id
     let chain_id = provider
-        .get_chainid()
+        .get_chain_id()
         .await
-        .map_err(|e| ScriptError::ClientInitialization(e.to_string()))?
-        .as_u64();
-    // Bound the wallet to the provider, via a middleware
-    let client = Arc::new(SignerMiddleware::new(
-        provider,
-        wallet.clone().with_chain_id(chain_id),
-    ));
+        .map_err(|e| ScriptError::ClientInitialization(e.to_string()))?;
 
-    Ok(client)
+    info!("Build client on chain ID: {}", chain_id);
+
+    Ok(provider)
 }
 
 /// Executes a command, returning an error if the command fails
@@ -141,19 +154,19 @@ pub async fn deploy_stylus_contract(
     wasm_file_path: PathBuf,
     rpc_url: &str,
     priv_key: &str,
-    client: Arc<LocalWalletHttpClient>,
+    client: RpcProvider,
 ) -> Result<(), ScriptError> {
-    // Get expected deployment address
-    let deployer_address = client
-        .default_sender()
-        .ok_or(ScriptError::ClientInitialization(
-            "client does not have sender attached".to_string(),
-        ))?;
+    // Extract first signer from the iterator
+    let deployer_address = client.signer().default_signer().address();
+    info!("Deployer address: {:#x}", deployer_address);
+
     let deployer_nonce = client
-        .get_transaction_count(deployer_address, None /* block */)
+        .get_transaction_count(deployer_address.clone())
         .await
         .map_err(|e| ScriptError::NonceFetching(e.to_string()))?;
-    let deployed_address = get_contract_address(deployer_address, deployer_nonce);
+    info!("Current deployer nonce: {:#x}", deployer_nonce);
+    // let deployed_address = get_contract_address([deployer_address, deployer_nonce]);
+    // info!("Computed address: {:#x}", deployed_address);
 
     // Run deploy command
     let mut deploy_cmd = Command::new("cargo");
@@ -169,7 +182,7 @@ pub async fn deploy_stylus_contract(
     command_success_or(deploy_cmd, "Failed to deploy Stylus contract")?;
 
     // Write the deployed address to the file
-    write_deployed_address("deployed.json", "consumption", deployed_address)?;
+    // write_deployed_address("deployed.json", "consumption", deployed_address)?;
 
     Ok(())
 }
@@ -205,3 +218,16 @@ pub fn write_deployed_address(
 
     Ok(())
 }
+
+/*pub fn get_contract_address(data: &[&dyn Encodable]) -> Address {
+    // Array of stuff to encode
+    let mut out = BytesMut::new();
+    // Perform RLP encoding
+    encode_list(data, &mut out);
+
+    let hash = keccak256(&out);
+
+    let mut bytes = [0u8; 20];
+    bytes.copy_from_slice(&hash[12..]);
+    Address::from(bytes)
+}*/
