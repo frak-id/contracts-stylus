@@ -5,7 +5,6 @@ use alloy::{
     rpc::types::eth::TransactionRequest,
     sol,
 };
-use alloy_primitives::address;
 use tracing::info;
 
 use crate::{
@@ -52,7 +51,9 @@ pub async fn init_contracts(
     // Build the tx
     let tx_request = TransactionRequest::default()
         .to(deployed_address)
-        .with_call(&doNothingCall {})
+        .with_call(&initializeCall {
+            owner: owner_address
+        })
         .with_value(U256::from(0));
 
     // Send it
@@ -74,5 +75,4 @@ pub async fn init_contracts(
 
 sol! {
     function initialize(address owner) external;
-    function doNothing() external;
 }

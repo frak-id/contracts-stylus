@@ -11,7 +11,7 @@ pub trait OwnedParams {}
 
 // Declare events and Solidity error types
 sol! {
-    event OwnershipTransferred(address indexed user, address indexed newOwner);
+    event OwnershipTransferred(address indexed owner);
 
     error Unauthorized();
     error AlreadyInitialized();
@@ -38,7 +38,7 @@ impl<T: OwnedParams> Owned<T> {
     /// Initialize the contract with an owner.
     pub fn initialize(&mut self, _owner: Address) -> Result<(), OwnedError> {
         // Ensure that the contract has not been initialized
-        if !self.owner.get().is_empty() {
+        if !self.owner.get().is_zero() {
             return Err(OwnedError::AlreadyInitialized(AlreadyInitialized {}));
         }
 
@@ -49,6 +49,9 @@ impl<T: OwnedParams> Owned<T> {
 
         // Set the owner
         self.owner.set(_owner);
+
+        // Emit the transfer
+        evm::log(OwnershipTransferred { owner: _owner });
 
         Ok(())
     }
@@ -77,10 +80,7 @@ impl<T: OwnedParams> Owned<T> {
         self.owner.set(new_owner);
 
         // Emit a ownership transfer event
-        evm::log(OwnershipTransferred {
-            user: msg::sender(),
-            newOwner: new_owner,
-        });
+        evm::log(OwnershipTransferred { owner: new_owner });
 
         Ok(())
     }

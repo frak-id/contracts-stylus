@@ -61,7 +61,7 @@ pub struct ContentConsumptionContract {
     eip712: Eip712<CoreParam>,
     #[borrow]
     owned: Owned<CoreParam>,
-    // The consumption nonce for each users
+    // The consumption nonce for each user's
     consumption_nonce: StorageMap<FixedBytes<32>, StorageU256>,
 }
 
@@ -95,11 +95,6 @@ impl ContentConsumptionContract {
         self.owned.initialize(owner)?;
 
         // Return the success
-        Ok(())
-    }
-
-    #[selector(name = "doNothing")]
-    pub fn do_nothing(&mut self) -> Result<(), Vec<u8>> {
         Ok(())
     }
 

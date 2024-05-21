@@ -48,7 +48,6 @@ impl Command {
             Command::DeployContracts(args) => {
                 info!("Deploying contracts...");
                 deploy_contracts(args, rpc_url, priv_key, client).await?;
-
                 Ok(())
             }
             Command::InitContracts(args) => {
