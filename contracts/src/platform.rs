@@ -1,9 +1,11 @@
 use alloc::{string::String, vec, vec::Vec};
 use core::marker::PhantomData;
+
 use stylus_sdk::{
     alloy_primitives::{Address, FixedBytes},
     alloy_sol_types::sol,
     crypto::keccak,
+    evm,
     msg::{self},
     prelude::*,
     storage::{StorageAddress, StorageB256, StorageB32, StorageMap, StorageString},
@@ -13,6 +15,8 @@ pub trait PlatformParams {}
 
 // Define events and errors in the contract
 sol! {
+    event PlatformRegistered(bytes32 indexed platformId, address owner, bytes4 contentType, bytes32 origin);
+
     error NotPlatformOwner();
     error PlatformAlreadyExist();
     error PlatformDontExist();
@@ -40,7 +44,7 @@ pub struct PlatformMetadata {
 /// TODO: When alloy-rs is updated on the stylus SDK, use a sol! macro to define the type
 type PlatformMetadataType = (String, Address, FixedBytes<4>, FixedBytes<32>);
 
-// Define the global conntract storage
+// Define the global contract storage
 #[solidity_storage]
 pub struct PlatformContract<T: PlatformParams> {
     // The platform metadata storage (platform_id => PlatformMetadata)
@@ -55,13 +59,13 @@ impl<T: PlatformParams> PlatformContract<T> {
     /* -------------------------------------------------------------------------- */
 
     /// Check if a platform exist
-    fn _platform_exist(&self, platform_id: FixedBytes<32>) -> bool {
-        self.platform_data.get(platform_id).owner.is_empty()
+    fn is_not_existent_platform(&self, platform_id: FixedBytes<32>) -> bool {
+        self.platform_data.get(platform_id).owner.get().is_zero()
     }
 
     /// Only allow the call for an existing platform
     pub fn only_existing_platform(&self, platform_id: FixedBytes<32>) -> Result<(), PlatformError> {
-        if !self._platform_exist(platform_id) {
+        if self.is_not_existent_platform(platform_id) {
             return Err(PlatformError::PlatformDontExist(PlatformDontExist {}));
         }
         Ok(())
@@ -82,16 +86,16 @@ impl<T: PlatformParams> PlatformContract<T> {
 
     /// Create a new platform
     /// returns the created platform_id
-    pub fn _create_platform(
+    pub fn create_platform(
         &mut self,
         name: String,
         owner: Address,
         content_type: FixedBytes<4>,
         origin: FixedBytes<32>,
     ) -> Result<FixedBytes<32>, PlatformError> {
-        let platform_id = keccak(origin);
+        let platform_id = keccak(&origin);
         // Ensure the platform doesn't already exist
-        if self._platform_exist(platform_id) {
+        if !self.is_not_existent_platform(platform_id) {
             return Err(PlatformError::PlatformAlreadyExist(PlatformAlreadyExist {}));
         }
 
@@ -108,30 +112,16 @@ impl<T: PlatformParams> PlatformContract<T> {
         metadata.content_type.set(content_type);
         metadata.origin.set(origin);
 
+        // Emit the event
+        evm::log(PlatformRegistered {
+            platformId: platform_id.0,
+            owner,
+            contentType: content_type.0,
+            origin: origin.0,
+        });
+
         // Return the created platform_id
         Ok(platform_id)
-    }
-
-    /// Update a platform metadata (could be name or owner)
-    fn _update_platform_metadata(
-        &mut self,
-        platform_id: FixedBytes<32>,
-        name: String,
-        owner: Address,
-    ) -> Result<(), PlatformError> {
-        self.only_existing_platform(platform_id)?;
-
-        // Ensure name isn't empty
-        if name.is_empty() | owner.is_zero() {
-            return Err(PlatformError::InvalidMetadata(InvalidMetadata {}));
-        }
-        // Get the right metadata setter
-        let mut metadata = self.platform_data.setter(platform_id);
-        // Create the new platform metadata
-        metadata.name.set_str(name);
-        metadata.owner.set(owner);
-        // Return success
-        Ok(())
     }
 }
 
@@ -150,14 +140,26 @@ impl<T: PlatformParams> PlatformContract<T> {
         name: String,
         owner: Address,
     ) -> Result<(), PlatformError> {
+        self.only_existing_platform(platform_id)?;
+
         let caller = msg::sender();
         // Ensure the caller is the owner
         if !self.platform_data.get(platform_id).owner.get().eq(&caller) {
             return Err(PlatformError::NotPlatformOwner(NotPlatformOwner {}));
         }
 
-        // Update the platform metadata
-        self._update_platform_metadata(platform_id, name, owner)
+        // Ensure name isn't empty
+        if name.is_empty() | owner.is_zero() {
+            return Err(PlatformError::InvalidMetadata(InvalidMetadata {}));
+        }
+
+        // Get the right metadata setter
+        let mut metadata = self.platform_data.setter(platform_id);
+        // Create the new platform metadata
+        metadata.name.set_str(name);
+        metadata.owner.set(owner);
+        // Return success
+        Ok(())
     }
 
     /* -------------------------------------------------------------------------- */

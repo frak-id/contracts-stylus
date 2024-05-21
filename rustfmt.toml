@@ -1,0 +1,9 @@
+use_field_init_shorthand = true
+
+# Enable unstable fmt features
+unstable_features = true
+
+# Import formatting
+reorder_imports = true
+group_imports="StdExternalCrate"
+imports_granularity = "Crate"

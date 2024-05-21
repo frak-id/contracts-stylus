@@ -1,11 +1,13 @@
 //! Definitions of CLI arguments and commands for deploy scripts
 
-use crate::commands::deploy_contracts;
-use crate::errors::ScriptError;
-use crate::utils::LocalWalletHttpClient;
 use clap::{Args, Parser, Subcommand};
-use std::sync::Arc;
 use tracing::info;
+
+use crate::{
+    commands::{create_platform, deploy_contracts},
+    errors::ScriptError,
+    utils::RpcProvider,
+};
 
 /// Scripts for deploying & upgrading the Renegade Stylus contracts
 #[derive(Parser)]
@@ -36,21 +38,19 @@ impl Command {
     /// Run the command
     pub async fn run(
         self,
-        client: Arc<LocalWalletHttpClient>,
+        client: RpcProvider,
         rpc_url: &str,
         priv_key: &str,
     ) -> Result<(), ScriptError> {
         match self {
             Command::DeployContracts(args) => {
                 info!("Deploying contracts...");
-                // TODO: Do some shit here
                 deploy_contracts(args, rpc_url, priv_key, client).await?;
-
                 Ok(())
             }
             Command::CreatePlatform(_args) => {
                 info!("Setting up platform...");
-                // TODO: Do some shit here
+                create_platform(_args, client).await?;
                 Ok(())
             }
         }
@@ -59,11 +59,7 @@ impl Command {
 
 /// Deploy contracts
 #[derive(Args)]
-pub struct DeployContractsArgs {
-    /// Address of the owner of the contracts
-    #[arg(short, long)]
-    pub owner: String,
-}
+pub struct DeployContractsArgs {}
 
 /// Setup some test platforms
 #[derive(Args)]
@@ -75,6 +71,6 @@ pub struct CreatePlatformArgs {
     #[arg(long)]
     pub content_type: u32,
     /// Type of the content
-    #[arg(short, long)]
+    #[arg(long)]
     pub origin: String,
 }

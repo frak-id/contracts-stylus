@@ -1,7 +1,5 @@
 use clap::Parser;
-use scripts::constants::DEFAULT_RPC;
-use scripts::utils::setup_client;
-use scripts::{cli::Cli, errors::ScriptError};
+use scripts::{cli::Cli, constants::DEFAULT_RPC, errors::ScriptError, utils::setup_client};
 
 #[tokio::main]
 async fn main() -> Result<(), ScriptError> {

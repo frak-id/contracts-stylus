@@ -6,6 +6,7 @@ extern crate alloc;
 #[global_allocator]
 static ALLOC: mini_alloc::MiniAlloc = mini_alloc::MiniAlloc::INIT;
 use alloc::vec;
+
 use alloy_primitives::keccak256;
 use stylus_sdk::{
     alloy_primitives::{Address, FixedBytes, U256},
@@ -60,7 +61,7 @@ pub struct ContentConsumptionContract {
     eip712: Eip712<CoreParam>,
     #[borrow]
     owned: Owned<CoreParam>,
-    // The consumption nonce for each users
+    // The consumption nonce for each user's
     consumption_nonce: StorageMap<FixedBytes<32>, StorageU256>,
 }
 
@@ -183,7 +184,7 @@ impl ContentConsumptionContract {
         // Create the platform
         let platform_id = self
             .platform
-            ._create_platform(name, owner, content_type, origin)?;
+            .create_platform(name, owner, content_type, origin)?;
 
         // Return the success and the created platform id
         Ok(platform_id)

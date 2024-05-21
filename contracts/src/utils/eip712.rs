@@ -1,8 +1,9 @@
 //! Helper to use eip712 separator on a given contract
 use core::marker::PhantomData;
+
 use stylus_sdk::{
-    alloy_primitives::{Address, FixedBytes, U64},
-    alloy_sol_types::sol,
+    alloy_primitives::{Address, FixedBytes, U256, U64},
+    alloy_sol_types::{sol, SolType},
     block, contract,
     crypto::keccak,
     prelude::*,
@@ -44,12 +45,23 @@ impl<T: Eip712Params> Eip712<T> {
 
     /// Compute a new domain separator
     fn compute_domain_separator() -> FixedBytes<32> {
-        let mut digest_input = [0u8; 160];
+        // Direct rust variant, failing on contract address, idk why
+        /*let mut digest_input = [0u8; 160];
         digest_input[0..32].copy_from_slice(&keccak("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)".as_bytes())[..]);
         digest_input[32..64].copy_from_slice(&keccak(T::NAME.as_bytes())[..]);
         digest_input[64..96].copy_from_slice(&keccak(T::VERSION.as_bytes())[..]);
-        digest_input[96..128].copy_from_slice(&block::chainid().to_be_bytes()[..]);
-        digest_input[128..160].copy_from_slice(&contract::address()[..]);
+        digest_input[96..128].copy_from_slice(&U256::from(block::chainid()).as_le_slice()[..]);
+        digest_input[128..160].copy_from_slice(&contract::address()[..]);*/
+
+        let digest_input = keccak(
+            <sol! { (bytes32, bytes32, bytes32, uint256, address) }>::encode(&(
+                keccak("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)").0,
+                keccak(T::NAME.as_bytes()).0,
+                keccak(T::VERSION.as_bytes()).0,
+                U256::from(block::chainid()),
+                contract::address(),
+            )),
+        );
 
         keccak(digest_input)
     }

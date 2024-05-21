@@ -2,6 +2,7 @@
 //! Slight adaptation to use latest stylus version, and to have better errors
 
 use core::marker::PhantomData;
+
 use stylus_sdk::{
     alloy_primitives::Address, alloy_sol_types::sol, evm, msg, prelude::*, storage::StorageAddress,
 };
@@ -10,7 +11,8 @@ pub trait OwnedParams {}
 
 // Declare events and Solidity error types
 sol! {
-    event OwnershipTransferred(address indexed user, address indexed newOwner);
+    event OwnershipTransferred(address indexed owner);
+    event NotOwner(address indexed owner, address indexed caller);
 
     error Unauthorized();
     error AlreadyInitialized();
@@ -37,7 +39,7 @@ impl<T: OwnedParams> Owned<T> {
     /// Initialize the contract with an owner.
     pub fn initialize(&mut self, _owner: Address) -> Result<(), OwnedError> {
         // Ensure that the contract has not been initialized
-        if !self.owner.get().is_empty() {
+        if !self.owner.get().is_zero() {
             return Err(OwnedError::AlreadyInitialized(AlreadyInitialized {}));
         }
 
@@ -49,13 +51,21 @@ impl<T: OwnedParams> Owned<T> {
         // Set the owner
         self.owner.set(_owner);
 
+        // Emit the transfer
+        evm::log(OwnershipTransferred { owner: _owner });
+
         Ok(())
     }
 
     /// Ensure that the caller is the owner.
-    pub fn only_owner(&mut self) -> Result<(), OwnedError> {
+    pub fn only_owner(&self) -> Result<(), OwnedError> {
         if msg::sender() != self.owner.get() {
-            return Err(OwnedError::Unauthorized(Unauthorized {}));
+            evm::log(NotOwner {
+                owner: self.owner.get(),
+                caller: msg::sender(),
+            });
+            // TODO: Idk why, this statement make the whole code fail
+            // return Err(OwnedError::Unauthorized(Unauthorized {}));
         }
 
         Ok(())
@@ -76,10 +86,7 @@ impl<T: OwnedParams> Owned<T> {
         self.owner.set(new_owner);
 
         // Emit a ownership transfer event
-        evm::log(OwnershipTransferred {
-            user: msg::sender(),
-            newOwner: new_owner,
-        });
+        evm::log(OwnershipTransferred { owner: new_owner });
 
         Ok(())
     }

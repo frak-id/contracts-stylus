@@ -4,6 +4,8 @@
     <content url="file://$MODULE_DIR$">
       <sourceFolder url="file://$MODULE_DIR$/contracts/src" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/scripts/src" isTestSource="false" />
+      <excludeFolder url="file://$MODULE_DIR$/contracts/target" />
+      <excludeFolder url="file://$MODULE_DIR$/scripts/target" />
       <excludeFolder url="file://$MODULE_DIR$/target" />
     </content>
     <orderEntry type="inheritedJdk" />
