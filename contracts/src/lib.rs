@@ -98,6 +98,11 @@ impl ContentConsumptionContract {
         Ok(())
     }
 
+    #[selector(name = "doNothing")]
+    pub fn do_nothing(&mut self) -> Result<(), Vec<u8>> {
+        Ok(())
+    }
+
     /// Get the current nonce for the given platform
     #[selector(name = "getNonceForPlatform")]
     pub fn get_nonce_for_platform(&self, user: Address, platform_id: FixedBytes<32>) -> U256 {

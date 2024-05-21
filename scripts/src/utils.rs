@@ -8,14 +8,16 @@ use std::{
     process::{Command, Stdio},
 };
 
-use alloy_network::{Ethereum, EthereumSigner};
-use alloy_primitives::Address;
-use alloy_provider::{
-    fillers::{ChainIdFiller, FillProvider, GasFiller, JoinFill, NonceFiller, SignerFiller},
-    Identity, Provider, ProviderBuilder, ReqwestProvider, WalletProvider,
+use alloy::{
+    network::{Ethereum, EthereumSigner},
+    primitives::{keccak256, Address},
+    providers::{
+        fillers::{ChainIdFiller, FillProvider, GasFiller, JoinFill, NonceFiller, SignerFiller},
+        Identity, Provider, ProviderBuilder, ReqwestProvider, WalletProvider,
+    },
+    signers::{k256::ecdsa::SigningKey, wallet::Wallet},
 };
-use alloy_signer::k256::ecdsa::SigningKey;
-use alloy_signer_wallet::Wallet;
+use ethers::{types::U256, utils::rlp};
 use json::JsonValue;
 use reqwest::{Client, Url};
 use tracing::info;
@@ -31,7 +33,7 @@ type RecommendFiller =
 pub type RpcProvider = FillProvider<
     JoinFill<RecommendFiller, SignerFiller<EthereumSigner>>,
     ReqwestProvider,
-    alloy_transport_http::Http<Client>,
+    alloy::transports::http::Http<Client>,
     Ethereum,
 >;
 
@@ -44,12 +46,7 @@ pub async fn setup_client(priv_key: &str, rpc_url: &str) -> Result<RpcProvider, 
         .map_err(|e| ScriptError::ClientInitialization(e.to_string()))?;
 
     // Create our provider with the rpc client + signer
-    let provider: FillProvider<
-        JoinFill<RecommendFiller, SignerFiller<EthereumSigner>>,
-        ReqwestProvider,
-        alloy_transport_http::Http<Client>,
-        Ethereum,
-    > = ProviderBuilder::new()
+    let provider = ProviderBuilder::new()
         .with_recommended_fillers()
         .signer(EthereumSigner::from(signer))
         .on_http(rpc_url.parse::<Url>().unwrap());
@@ -67,7 +64,6 @@ pub async fn setup_client(priv_key: &str, rpc_url: &str) -> Result<RpcProvider, 
 
 /// Executes a command, returning an error if the command fails
 fn command_success_or(mut cmd: Command, err_msg: &str) -> Result<(), ScriptError> {
-    println!("Running command: {:?}", cmd);
     if !cmd
         .output()
         .map_err(|e| ScriptError::ContractCompilation(e.to_string()))?
@@ -154,18 +150,21 @@ pub async fn deploy_stylus_contract(
     rpc_url: &str,
     priv_key: &str,
     client: RpcProvider,
-) -> Result<(), ScriptError> {
+) -> Result<Address, ScriptError> {
     // Extract first signer from the iterator
     let deployer_address = client.signer().default_signer().address();
-    info!("Deployer address: {:#x}", deployer_address);
 
+    // Get the deployer nonce and compute the contract address
     let deployer_nonce = client
         .get_transaction_count(deployer_address.clone())
         .await
         .map_err(|e| ScriptError::NonceFetching(e.to_string()))?;
-    info!("Current deployer nonce: {:#x}", deployer_nonce);
-    // let deployed_address = get_contract_address([deployer_address, deployer_nonce]);
-    // info!("Computed address: {:#x}", deployed_address);
+
+    let deployed_address = get_contract_address(
+        deployer_address.to_string().parse::<Address>().unwrap(),
+        deployer_nonce,
+    );
+    info!("Computed address: {:#x}", deployed_address);
 
     // Run deploy command
     let mut deploy_cmd = Command::new("cargo");
@@ -181,9 +180,39 @@ pub async fn deploy_stylus_contract(
     command_success_or(deploy_cmd, "Failed to deploy Stylus contract")?;
 
     // Write the deployed address to the file
-    // write_deployed_address("deployed.json", "consumption", deployed_address)?;
+    write_deployed_address("deployed.json", "consumption", deployed_address)?;
 
-    Ok(())
+    Ok(deployed_address)
+}
+
+pub fn read_deployed_addresses(
+    file_path: &str,
+    contract_key: &str,
+) -> Result<Address, ScriptError> {
+    // If the file doesn't exist, create it
+    if !PathBuf::from(file_path).exists() {
+        return Err(ScriptError::JsonOutputError(String::from(
+            "Deployed addresses file not found",
+        )));
+    }
+
+    // Read the current file contents
+    let mut file_contents = String::new();
+    File::open(file_path)
+        .map_err(|e| ScriptError::JsonOutputError(e.to_string()))?
+        .read_to_string(&mut file_contents)
+        .map_err(|e| ScriptError::JsonOutputError(e.to_string()))?;
+
+    // Parse it's json content into objects
+    let parsed_json =
+        json::parse(&file_contents).map_err(|e| ScriptError::JsonOutputError(e.to_string()))?;
+
+    Ok(parsed_json[contract_key]
+        .clone()
+        .as_str()
+        .unwrap()
+        .parse::<Address>()
+        .unwrap())
 }
 
 /// Writes the given address for the deployed contract
@@ -218,15 +247,23 @@ pub fn write_deployed_address(
     Ok(())
 }
 
-/*pub fn get_contract_address(data: &[&dyn Encodable]) -> Address {
-    // Array of stuff to encode
-    let mut out = BytesMut::new();
-    // Perform RLP encoding
-    encode_list(data, &mut out);
-
-    let hash = keccak256(&out);
+/// Get the contract address from the contract creation data
+/// TODO: Should use alloy RLP here, but didn't manage to get it working nicely
+/// This is not working:
+/// ```
+///    let mut out: Vec<u8> = Vec::new();
+//     let list: [&dyn Encodable; 2] = [&signer.as_slice().to_vec(), &nonce];
+//     alloy_rlp::encode_list::<_, dyn Encodable>(&list, &mut out);
+/// ```
+fn get_contract_address(signer: Address, nonce: u64) -> Address {
+    // Ethers RLP
+    let mut stream = rlp::RlpStream::new();
+    stream.begin_list(2);
+    stream.append(&signer.to_vec());
+    stream.append(&U256::from(nonce));
+    let hash = keccak256(&stream.out());
 
     let mut bytes = [0u8; 20];
     bytes.copy_from_slice(&hash[12..]);
     Address::from(bytes)
-}*/
+}

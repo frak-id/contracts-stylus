@@ -3,7 +3,11 @@
 use clap::{Args, Parser, Subcommand};
 use tracing::info;
 
-use crate::{commands::deploy_contracts, errors::ScriptError, utils::RpcProvider};
+use crate::{
+    commands::{deploy_contracts, init_contracts},
+    errors::ScriptError,
+    utils::RpcProvider,
+};
 
 /// Scripts for deploying & upgrading the Renegade Stylus contracts
 #[derive(Parser)]
@@ -26,6 +30,8 @@ pub struct Cli {
 pub enum Command {
     /// Deploy all the contracts
     DeployContracts(DeployContractsArgs),
+    /// Deploy all the contracts
+    InitContracts(InitContractsArgs),
     /// Create a new platform
     CreatePlatform(CreatePlatformArgs),
 }
@@ -41,9 +47,13 @@ impl Command {
         match self {
             Command::DeployContracts(args) => {
                 info!("Deploying contracts...");
-                // TODO: Do some shit here
                 deploy_contracts(args, rpc_url, priv_key, client).await?;
 
+                Ok(())
+            }
+            Command::InitContracts(args) => {
+                info!("Init contracts...");
+                init_contracts(args, rpc_url, priv_key, client).await?;
                 Ok(())
             }
             Command::CreatePlatform(_args) => {
@@ -57,7 +67,11 @@ impl Command {
 
 /// Deploy contracts
 #[derive(Args)]
-pub struct DeployContractsArgs {
+pub struct DeployContractsArgs {}
+
+/// Deploy contracts
+#[derive(Args)]
+pub struct InitContractsArgs {
     /// Address of the owner of the contracts
     #[arg(short, long)]
     pub owner: String,

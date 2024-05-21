@@ -4,7 +4,6 @@
 #![allow(incomplete_features)]
 #![feature(generic_const_exprs)]
 
-pub mod abi;
 pub mod cli;
 pub mod commands;
 pub mod constants;

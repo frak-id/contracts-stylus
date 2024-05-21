@@ -1,17 +1,22 @@
-use alloy_primitives::{hex::ToHexExt, Address};
-use alloy_sol_types::SolCall;
+use alloy::{
+    network::TransactionBuilder,
+    primitives::{Address, U256},
+    providers::Provider,
+    rpc::types::eth::TransactionRequest,
+    sol,
+};
+use alloy_primitives::address;
 use tracing::info;
 
 use crate::{
-    abi::initializeCall,
-    cli::DeployContractsArgs,
+    cli::{DeployContractsArgs, InitContractsArgs},
     errors::ScriptError,
-    utils::{build_stylus_contract, deploy_stylus_contract, RpcProvider},
+    utils::{build_stylus_contract, deploy_stylus_contract, read_deployed_addresses, RpcProvider},
 };
 
 /// Deploy the Frak consumption contracts
 pub async fn deploy_contracts(
-    args: DeployContractsArgs,
+    _args: DeployContractsArgs,
     rpc_url: &str,
     priv_key: &str,
     client: RpcProvider,
@@ -23,32 +28,51 @@ pub async fn deploy_contracts(
 
     // Deploy them
     info!("Deploying contracts...");
-    deploy_stylus_contract(wasm_file_path, rpc_url, priv_key, client).await?;
+    deploy_stylus_contract(wasm_file_path, rpc_url, priv_key, client.clone()).await?;
     info!("Deployed with success");
-
-    // Perform the init call
-    info!("Performing init call...");
-    // Should switch from ethers to full on alloy
-    // Sending tx stuff: https://alloy-rs.github.io/alloy/alloy_signer/index.html
-    let init_calldata = get_init_calldata(args)?;
-    println!("Init calldata: {}", init_calldata.encode_hex());
-
-    // TODO: What should we do here:
-    //  - Build the contract
-    //  - Deploy it
-    //  - Call initialise function on it
 
     Ok(())
 }
 
-// Get the initial calldata for the contract
-fn get_init_calldata(args: DeployContractsArgs) -> Result<Vec<u8>, ScriptError> {
-    println!("Owner: {}", args.owner);
-    let owner_address = Address::from_slice(args.owner.as_bytes());
-    println!("Parsed owner: {}", owner_address);
+pub async fn init_contracts(
+    args: InitContractsArgs,
+    _rpc_url: &str,
+    _priv_key: &str,
+    client: RpcProvider,
+) -> Result<(), ScriptError> {
+    // Fetch contract address from json
+    let deployed_address = read_deployed_addresses("deployed.json", "consumption")?;
 
-    Ok(initializeCall {
-        owner: owner_address,
-    }
-    .encode())
+    // Perform the init call
+    info!("Performing init call...");
+
+    // Parse the owner address
+    let owner_address = args.owner.parse::<Address>().unwrap();
+
+    // Build the tx
+    let tx_request = TransactionRequest::default()
+        .to(deployed_address)
+        .with_call(&doNothingCall {})
+        .with_value(U256::from(0));
+
+    // Send it
+    let pending_tx = client
+        .send_transaction(tx_request)
+        .await
+        .map_err(|e| ScriptError::ContractInteraction(e.to_string()))?;
+    println!("Pending init transaction... {}", pending_tx.tx_hash());
+
+    // Wait for the transaction to be included.
+    let receipt = pending_tx
+        .get_receipt()
+        .await
+        .map_err(|e| ScriptError::ContractInteraction(e.to_string()))?;
+    println!("Init tx done on block: {}", receipt.block_number.unwrap());
+
+    Ok(())
+}
+
+sol! {
+    function initialize(address owner) external;
+    function doNothing() external;
 }
