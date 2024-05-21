@@ -4,7 +4,7 @@ use clap::{Args, Parser, Subcommand};
 use tracing::info;
 
 use crate::{
-    commands::{create_platform, deploy_contracts, init_contracts},
+    commands::{create_platform, deploy_contracts},
     errors::ScriptError,
     utils::RpcProvider,
 };
@@ -30,8 +30,6 @@ pub struct Cli {
 pub enum Command {
     /// Deploy all the contracts
     DeployContracts(DeployContractsArgs),
-    /// Deploy all the contracts
-    InitContracts(InitContractsArgs),
     /// Create a new platform
     CreatePlatform(CreatePlatformArgs),
 }
@@ -50,11 +48,6 @@ impl Command {
                 deploy_contracts(args, rpc_url, priv_key, client).await?;
                 Ok(())
             }
-            Command::InitContracts(args) => {
-                info!("Init contracts...");
-                init_contracts(args, client).await?;
-                Ok(())
-            }
             Command::CreatePlatform(_args) => {
                 info!("Setting up platform...");
                 create_platform(_args, client).await?;
@@ -67,14 +60,6 @@ impl Command {
 /// Deploy contracts
 #[derive(Args)]
 pub struct DeployContractsArgs {}
-
-/// Deploy contracts
-#[derive(Args)]
-pub struct InitContractsArgs {
-    /// Address of the owner of the contracts
-    #[arg(short, long)]
-    pub owner: String,
-}
 
 /// Setup some test platforms
 #[derive(Args)]

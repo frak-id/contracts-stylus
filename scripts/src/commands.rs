@@ -1,14 +1,14 @@
 use alloy::{
     network::TransactionBuilder,
     primitives::{aliases::B32, keccak256, Address, U256},
-    providers::Provider,
+    providers::{Provider, WalletProvider},
     rpc::types::eth::TransactionRequest,
     sol,
 };
 use tracing::info;
 
 use crate::{
-    cli::{CreatePlatformArgs, DeployContractsArgs, InitContractsArgs},
+    cli::{CreatePlatformArgs, DeployContractsArgs},
     errors::ScriptError,
     utils::{build_stylus_contract, deploy_stylus_contract, read_deployed_addresses, RpcProvider},
 };
@@ -30,29 +30,26 @@ pub async fn deploy_contracts(
     deploy_stylus_contract(wasm_file_path, rpc_url, priv_key, client.clone()).await?;
     info!("Deployed with success");
 
+    // Init the contracts
+    info!("Init contracts...");
+    let deployer_address = client.signer().default_signer().address();
+    init_contracts(deployer_address, client.clone()).await?;
+
     Ok(())
 }
 
 /// Init consumption contracts
-pub async fn init_contracts(
-    args: InitContractsArgs,
-    client: RpcProvider,
-) -> Result<(), ScriptError> {
+async fn init_contracts(owner: Address, client: RpcProvider) -> Result<(), ScriptError> {
     // Fetch contract address from json
     let deployed_address = read_deployed_addresses("deployed.json", "consumption")?;
 
     // Perform the init call
     info!("Crafting init call...");
 
-    // Parse the owner address
-    let owner_address = args.owner.parse::<Address>().unwrap();
-
     // Build the tx
     let tx_request = TransactionRequest::default()
         .to(deployed_address)
-        .with_call(&initializeCall {
-            owner: owner_address,
-        })
+        .with_call(&initializeCall { owner })
         .with_value(U256::from(0));
 
     // Send it

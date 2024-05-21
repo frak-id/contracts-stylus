@@ -184,7 +184,7 @@ impl ContentConsumptionContract {
         // Create the platform
         let platform_id = self
             .platform
-            ._create_platform(name, owner, content_type, origin)?;
+            .create_platform(name, owner, content_type, origin)?;
 
         // Return the success and the created platform id
         Ok(platform_id)
