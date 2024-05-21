@@ -1,5 +1,6 @@
 //! Helper to use eip712 separator on a given contract
 use core::marker::PhantomData;
+
 use stylus_sdk::{
     alloy_primitives::{Address, FixedBytes, U64},
     alloy_sol_types::sol,

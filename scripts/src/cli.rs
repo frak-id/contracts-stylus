@@ -1,10 +1,9 @@
 //! Definitions of CLI arguments and commands for deploy scripts
 
-use crate::commands::deploy_contracts;
-use crate::errors::ScriptError;
-use crate::utils::RpcProvider;
 use clap::{Args, Parser, Subcommand};
 use tracing::info;
+
+use crate::{commands::deploy_contracts, errors::ScriptError, utils::RpcProvider};
 
 /// Scripts for deploying & upgrading the Renegade Stylus contracts
 #[derive(Parser)]

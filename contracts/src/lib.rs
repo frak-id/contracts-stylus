@@ -6,6 +6,7 @@ extern crate alloc;
 #[global_allocator]
 static ALLOC: mini_alloc::MiniAlloc = mini_alloc::MiniAlloc::INIT;
 use alloc::vec;
+
 use alloy_primitives::keccak256;
 use stylus_sdk::{
     alloy_primitives::{Address, FixedBytes, U256},

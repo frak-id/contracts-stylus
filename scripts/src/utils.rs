@@ -1,27 +1,26 @@
 //! Utilities for the deploy scripts.
 
-use alloy_network::{Ethereum, EthereumSigner};
-use alloy_primitives::Address;
-use alloy_provider::fillers::{
-    ChainIdFiller, FillProvider, GasFiller, JoinFill, NonceFiller, SignerFiller,
-};
-use alloy_provider::{Identity, Provider, ProviderBuilder, ReqwestProvider, WalletProvider};
-use alloy_signer::k256::ecdsa::SigningKey;
-use std::fs::File;
-use std::io::Read;
 use std::{
     env, fs,
+    fs::File,
+    io::Read,
     path::PathBuf,
     process::{Command, Stdio},
 };
 
-use crate::constants::WASM_TARGET_TRIPLE;
+use alloy_network::{Ethereum, EthereumSigner};
+use alloy_primitives::Address;
+use alloy_provider::{
+    fillers::{ChainIdFiller, FillProvider, GasFiller, JoinFill, NonceFiller, SignerFiller},
+    Identity, Provider, ProviderBuilder, ReqwestProvider, WalletProvider,
+};
+use alloy_signer::k256::ecdsa::SigningKey;
 use alloy_signer_wallet::Wallet;
 use json::JsonValue;
 use reqwest::{Client, Url};
 use tracing::info;
 
-use crate::errors::ScriptError;
+use crate::{constants::WASM_TARGET_TRIPLE, errors::ScriptError};
 
 /// Re-export from alloy recommend filter
 type RecommendFiller =

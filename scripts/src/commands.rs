@@ -1,11 +1,13 @@
-use crate::abi::initializeCall;
-use crate::cli::DeployContractsArgs;
-use crate::errors::ScriptError;
-use crate::utils::{build_stylus_contract, deploy_stylus_contract, RpcProvider};
-use alloy_primitives::hex::ToHexExt;
-use alloy_primitives::Address;
+use alloy_primitives::{hex::ToHexExt, Address};
 use alloy_sol_types::SolCall;
 use tracing::info;
+
+use crate::{
+    abi::initializeCall,
+    cli::DeployContractsArgs,
+    errors::ScriptError,
+    utils::{build_stylus_contract, deploy_stylus_contract, RpcProvider},
+};
 
 /// Deploy the Frak consumption contracts
 pub async fn deploy_contracts(

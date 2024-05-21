@@ -2,6 +2,7 @@
 //! Slight adaptation to use latest stylus version, and to have better errors
 
 use core::marker::PhantomData;
+
 use stylus_sdk::{
     alloy_primitives::Address, alloy_sol_types::sol, evm, msg, prelude::*, storage::StorageAddress,
 };
