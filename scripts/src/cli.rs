@@ -4,7 +4,7 @@ use clap::{Args, Parser, Subcommand};
 use tracing::info;
 
 use crate::{
-    commands::{deploy_contracts, init_contracts},
+    commands::{create_platform, deploy_contracts, init_contracts},
     errors::ScriptError,
     utils::RpcProvider,
 };
@@ -52,12 +52,12 @@ impl Command {
             }
             Command::InitContracts(args) => {
                 info!("Init contracts...");
-                init_contracts(args, rpc_url, priv_key, client).await?;
+                init_contracts(args, client).await?;
                 Ok(())
             }
             Command::CreatePlatform(_args) => {
                 info!("Setting up platform...");
-                // TODO: Do some shit here
+                create_platform(_args, client).await?;
                 Ok(())
             }
         }
@@ -86,6 +86,6 @@ pub struct CreatePlatformArgs {
     #[arg(long)]
     pub content_type: u32,
     /// Type of the content
-    #[arg(short, long)]
+    #[arg(long)]
     pub origin: String,
 }

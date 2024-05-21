@@ -1,6 +1,6 @@
 use alloy::{
     network::TransactionBuilder,
-    primitives::{Address, U256},
+    primitives::{aliases::B32, keccak256, Address, U256},
     providers::Provider,
     rpc::types::eth::TransactionRequest,
     sol,
@@ -8,7 +8,7 @@ use alloy::{
 use tracing::info;
 
 use crate::{
-    cli::{DeployContractsArgs, InitContractsArgs},
+    cli::{CreatePlatformArgs, DeployContractsArgs, InitContractsArgs},
     errors::ScriptError,
     utils::{build_stylus_contract, deploy_stylus_contract, read_deployed_addresses, RpcProvider},
 };
@@ -33,17 +33,16 @@ pub async fn deploy_contracts(
     Ok(())
 }
 
+/// Init consumption contracts
 pub async fn init_contracts(
     args: InitContractsArgs,
-    _rpc_url: &str,
-    _priv_key: &str,
     client: RpcProvider,
 ) -> Result<(), ScriptError> {
     // Fetch contract address from json
     let deployed_address = read_deployed_addresses("deployed.json", "consumption")?;
 
     // Perform the init call
-    info!("Performing init call...");
+    info!("Crafting init call...");
 
     // Parse the owner address
     let owner_address = args.owner.parse::<Address>().unwrap();
@@ -52,7 +51,7 @@ pub async fn init_contracts(
     let tx_request = TransactionRequest::default()
         .to(deployed_address)
         .with_call(&initializeCall {
-            owner: owner_address
+            owner: owner_address,
         })
         .with_value(U256::from(0));
 
@@ -73,6 +72,52 @@ pub async fn init_contracts(
     Ok(())
 }
 
+/// Init consumption contracts
+pub async fn create_platform(
+    args: CreatePlatformArgs,
+    client: RpcProvider,
+) -> Result<(), ScriptError> {
+    // Fetch contract address from json
+    let deployed_address = read_deployed_addresses("deployed.json", "consumption")?;
+
+    // Parse the owner address
+    let owner_address = args.owner.parse::<Address>().unwrap();
+
+    // Build the tx
+    let tx_request = TransactionRequest::default()
+        .to(deployed_address)
+        .with_call(&registerPaltformCall {
+            name: "Test".to_string(),
+            owner: owner_address,
+            content_type: B32::from(args.content_type),
+            origin: keccak256(args.origin),
+        })
+        .with_value(U256::from(0));
+
+    // Send it
+    let pending_tx = client
+        .send_transaction(tx_request)
+        .await
+        .map_err(|e| ScriptError::ContractInteraction(e.to_string()))?;
+    println!(
+        "Pending create platform transaction... {}",
+        pending_tx.tx_hash()
+    );
+
+    // Wait for the transaction to be included.
+    let receipt = pending_tx
+        .get_receipt()
+        .await
+        .map_err(|e| ScriptError::ContractInteraction(e.to_string()))?;
+    println!(
+        "Create platform tx done on block: {}",
+        receipt.block_number.unwrap()
+    );
+
+    Ok(())
+}
+
 sol! {
     function initialize(address owner) external;
+    function registerPaltform(string calldata name, address owner, bytes4 content_type, bytes32 origin) external returns (bytes32);
 }
