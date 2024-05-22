@@ -40,10 +40,6 @@ pub struct PlatformMetadata {
     origin: StorageB256,
 }
 
-/// Define the type of the platform metadata, in an ideal world, it should be a sol type
-/// TODO: When alloy-rs is updated on the stylus SDK, use a sol! macro to define the type
-type PlatformMetadataType = (String, Address, FixedBytes<4>, FixedBytes<32>);
-
 // Define the global contract storage
 #[solidity_storage]
 pub struct PlatformContract<T: PlatformParams> {
@@ -167,18 +163,18 @@ impl<T: PlatformParams> PlatformContract<T> {
     /* -------------------------------------------------------------------------- */
 
     /// Get a platform metadata
+    /// TODO: Adding a string to the output create some strange output data (including string offset inside the output wtf)
     #[selector(name = "getPlatformMetadata")]
     #[view]
     pub fn get_platform_metadata(
         &self,
         platform_id: FixedBytes<32>,
-    ) -> Result<PlatformMetadataType, PlatformError> {
+    ) -> Result<(Address, FixedBytes<4>, FixedBytes<32>), PlatformError> {
         // Get the ptr to the platform metadata
         let ptr = self.platform_data.get(platform_id);
         // Return every field we are interested in
         Ok((
             // Classical metadata
-            ptr.name.get_string(),
             ptr.owner.get(),
             ptr.content_type.get(),
             ptr.origin.get(),

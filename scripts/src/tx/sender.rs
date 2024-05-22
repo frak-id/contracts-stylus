@@ -82,12 +82,23 @@ pub async fn send_create_platform(
     );
 
     // Read the smart contract
-    let platform_metadata = contract
+    let platform_name = contract
         .getPlatformName(keccak256(origin_hash))
         .call()
         .await
         .map_err(|e| ScriptError::ContractInteraction(e.to_string()))?;
-    info!("OnChain platform name: {:?}", platform_metadata._0);
+    info!("OnChain platform name: {:?}", platform_name._0);
+
+    // Read the smart contract
+    let platform_metadata = contract
+        .getPlatformMetadata(keccak256(origin_hash))
+        .call()
+        .await
+        .map_err(|e| ScriptError::ContractInteraction(e.to_string()))?;
+    info!(
+        "OnChain platform metadata: owner: {:?}, content type: {:?}, origin {:?}",
+        platform_metadata._0, platform_metadata._1, platform_metadata._2
+    );
 
     Ok(receipt.transaction_hash)
 }
@@ -96,5 +107,4 @@ pub async fn send_create_platform(
 TODO:
  - Craft a command to extract domain etc
  - Create a small typescript stuff that will try to push CCU
-
  */
