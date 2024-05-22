@@ -1,3 +1,5 @@
+use std::env;
+
 use alloy::{
     network::{Ethereum, EthereumSigner},
     providers::{
@@ -26,12 +28,10 @@ pub type RpcProvider = FillProvider<
 
 /// Sets up the address and client with which to instantiate a contract for testing,
 /// reading in the private key, RPC url, and contract address from the environment.
-pub async fn create_rpc_provider(
-    priv_key: &str,
-    rpc_url: &str,
-) -> Result<RpcProvider, ScriptError> {
+pub async fn create_rpc_provider() -> Result<RpcProvider, ScriptError> {
     // Create our signer
-    let signer = priv_key
+    let signer = env::var("PRIVATE_KEY")
+        .unwrap()
         .parse::<Wallet<SigningKey>>()
         .map_err(|e| ScriptError::ClientInitialization(e.to_string()))?;
 
@@ -39,7 +39,7 @@ pub async fn create_rpc_provider(
     let provider = ProviderBuilder::new()
         .with_recommended_fillers()
         .signer(EthereumSigner::from(signer))
-        .on_http(rpc_url.parse::<Url>().unwrap());
+        .on_http(env::var("RPC_URL").unwrap().parse::<Url>().unwrap());
 
     // Fetch chain id
     let chain_id = provider

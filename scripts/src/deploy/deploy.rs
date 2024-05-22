@@ -1,4 +1,5 @@
 use std::{
+    env,
     path::PathBuf,
     process::{Command, Stdio},
 };
@@ -14,8 +15,6 @@ use crate::{errors::ScriptError, tx::client::RpcProvider, utils::command_success
 /// Deploy a built stylus contract
 pub async fn deploy_contract(
     wasm_file_path: PathBuf,
-    rpc_url: &str,
-    priv_key: &str,
     client: RpcProvider,
 ) -> Result<Address, ScriptError> {
     // Predict the contract address
@@ -29,9 +28,9 @@ pub async fn deploy_contract(
     deploy_cmd.arg("--wasm-file");
     deploy_cmd.arg(&wasm_file_path);
     deploy_cmd.arg("-e");
-    deploy_cmd.arg(rpc_url);
+    deploy_cmd.arg(env::var("RPC_URL").unwrap());
     deploy_cmd.arg("--private-key");
-    deploy_cmd.arg(priv_key);
+    deploy_cmd.arg(env::var("PRIVATE_KEY").unwrap());
 
     command_success_or(deploy_cmd, "Failed to deploy Stylus contract")?;
 

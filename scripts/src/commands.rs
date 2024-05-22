@@ -1,5 +1,5 @@
 use alloy::{
-    primitives::{keccak256, Address},
+    primitives::{aliases::B32, keccak256, private::getrandom::getrandom, Address, B256},
     providers::WalletProvider,
 };
 use tracing::info;
@@ -19,8 +19,6 @@ use crate::{
 /// Deploy the Frak consumption contracts
 pub async fn deploy_contracts(
     _args: DeployContractsArgs,
-    rpc_url: &str,
-    priv_key: &str,
     client: RpcProvider,
 ) -> Result<(), ScriptError> {
     // Build the contracts
@@ -31,8 +29,7 @@ pub async fn deploy_contracts(
 
     // Deploy them
     info!("Deploying contracts...");
-    let contract_address =
-        deploy_contract(wasm_file_path, rpc_url, priv_key, client.clone()).await?;
+    let contract_address = deploy_contract(wasm_file_path, client.clone()).await?;
     write_output_file(
         OUTPUT_FILE,
         OutputKeys::Deployment { key: "consumption" },
@@ -64,10 +61,27 @@ pub async fn create_platform(
             .parse::<Address>()
             .unwrap();
 
+    // Update args.origin to also include a random number
+    let mut buf = [0u8; 32];
+    getrandom(&mut buf).unwrap();
+    let origin = format!("{}-{}", args.origin, B256::from(buf));
+
+    // Compute the origin hash
     let origin_hash = keccak256(&args.origin);
 
+    // Parse the owner address
+    let owner_address = args.owner.parse::<Address>().unwrap();
+
     // Send the tx
-    let tx_hash = send_create_platform(deployed_address, args, client).await?;
+    let tx_hash = send_create_platform(
+        deployed_address,
+        "test".to_string(),
+        origin,
+        owner_address,
+        B32::from(args.content_type),
+        client,
+    )
+    .await?;
 
     let tx_key = format!("create_platform_{origin_hash:x}");
 

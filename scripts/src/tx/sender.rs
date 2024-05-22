@@ -7,7 +7,6 @@ use alloy::{
 use tracing::info;
 
 use crate::{
-    cli::CreatePlatformArgs,
     errors::ScriptError,
     tx::{
         abi::{initializeCall, registerPlatformCall},
@@ -47,22 +46,22 @@ pub async fn send_init_consumption_contract(
 /// Create a new plateform
 pub async fn send_create_platform(
     contract: Address,
-    args: CreatePlatformArgs,
+    name: String,
+    origin: String,
+    owner: Address,
+    content_type: B32,
     client: RpcProvider,
 ) -> Result<TxHash, ScriptError> {
-    // Parse the owner address
-    let owner_address = args.owner.parse::<Address>().unwrap();
-
     // Perform a hash on the origin
-    let origin_hash = keccak256(args.origin);
+    let origin_hash = keccak256(origin);
 
     // Build the tx
     let tx_request = TransactionRequest::default()
         .to(contract)
         .with_call(&registerPlatformCall {
-            name: "Test".to_string(),
-            owner: owner_address,
-            content_type: B32::from(args.content_type),
+            name,
+            owner,
+            content_type,
             origin: origin_hash,
         })
         .with_value(U256::from(0));

@@ -12,14 +12,6 @@ use crate::{
 /// Scripts for deploying & upgrading the Renegade Stylus contracts
 #[derive(Parser)]
 pub struct Cli {
-    /// Private key of the deployer
-    #[arg(short, long)]
-    pub priv_key: String,
-
-    /// Network RPC URL
-    #[arg(short, long)]
-    pub rpc_url: Option<String>,
-
     /// The command to run
     #[command(subcommand)]
     pub command: Command,
@@ -36,21 +28,16 @@ pub enum Command {
 
 impl Command {
     /// Run the command
-    pub async fn run(
-        self,
-        client: RpcProvider,
-        rpc_url: &str,
-        priv_key: &str,
-    ) -> Result<(), ScriptError> {
+    pub async fn run(self, client: RpcProvider) -> Result<(), ScriptError> {
         match self {
             Command::DeployContracts(args) => {
                 info!("Deploying contracts...");
-                deploy_contracts(args, rpc_url, priv_key, client).await?;
+                deploy_contracts(args, client).await?;
                 Ok(())
             }
-            Command::CreatePlatform(_args) => {
+            Command::CreatePlatform(args) => {
                 info!("Setting up platform...");
-                create_platform(_args, client).await?;
+                create_platform(args, client).await?;
                 Ok(())
             }
         }

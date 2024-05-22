@@ -12,7 +12,6 @@ pub trait OwnedParams {}
 // Declare events and Solidity error types
 sol! {
     event OwnershipTransferred(address indexed owner);
-    event NotOwner(address indexed owner, address indexed caller);
 
     error Unauthorized();
     error AlreadyInitialized();
@@ -60,15 +59,10 @@ impl<T: OwnedParams> Owned<T> {
     /// Ensure that the caller is the owner.
     pub fn only_owner(&self) -> Result<(), OwnedError> {
         if msg::sender() != self.owner.get() {
-            evm::log(NotOwner {
-                owner: self.owner.get(),
-                caller: msg::sender(),
-            });
-            // TODO: Idk why, this statement make the whole code fail
-            // return Err(OwnedError::Unauthorized(Unauthorized {}));
+            Err(OwnedError::Unauthorized(Unauthorized {}))
+        } else {
+            Ok(())
         }
-
-        Ok(())
     }
 }
 
