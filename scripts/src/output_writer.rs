@@ -50,6 +50,7 @@ pub fn write_output_file<T: LowerHex>(
     // Update the right key
     match key {
         OutputKeys::Deployment { key } => {
+            parsed_json[key] = JsonValue::new_object();
             parsed_json[key]["deploy"] = JsonValue::String(format!("{value:#x}"))
         }
         OutputKeys::Init { key } => {

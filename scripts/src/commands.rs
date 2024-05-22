@@ -67,7 +67,7 @@ pub async fn create_platform(
     let origin = format!("{}-{}", args.origin, B256::from(buf));
 
     // Compute the origin hash
-    let origin_hash = keccak256(&args.origin);
+    let origin_hash = keccak256(&origin);
 
     // Parse the owner address
     let owner_address = args.owner.parse::<Address>().unwrap();
