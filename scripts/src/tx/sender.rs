@@ -3,13 +3,14 @@ use alloy::{
     primitives::{aliases::B32, keccak256, Address, TxHash, U256},
     providers::Provider,
     rpc::types::eth::TransactionRequest,
+    sol_types::SolCall,
 };
 use tracing::info;
 
 use crate::{
     errors::ScriptError,
     tx::{
-        abi::{initializeCall, registerPlatformCall},
+        abi::{getPlatformMetadataCall, initializeCall, registerPlatformCall},
         client::RpcProvider,
     },
 };
@@ -84,6 +85,22 @@ pub async fn send_create_platform(
     info!(
         "Create platform tx done on block: {}",
         receipt.block_number.unwrap()
+    );
+
+    // Read the smart contract
+    let read_tx = TransactionRequest::default()
+        .to(contract)
+        .with_call(&getPlatformMetadataCall {
+            platform_id: keccak256(origin_hash),
+        })
+        .with_value(U256::from(0));
+    let read_result = client.call(&read_tx).await.unwrap();
+    info!("Platform metadata results: {:?}", read_result);
+    // Decode output
+    let metadata_output = getPlatformMetadataCall::abi_decode_returns(&read_result, false).unwrap();
+    info!(
+        "Platform metadata decoded: name: {:?}, owner: {:?}",
+        metadata_output._0, metadata_output._1
     );
 
     Ok(receipt.transaction_hash)
