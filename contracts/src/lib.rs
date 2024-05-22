@@ -170,7 +170,7 @@ impl ContentConsumptionContract {
     /* -------------------------------------------------------------------------- */
 
     /// Register a new platform (only callable by the owner)
-    #[selector(name = "registerPaltform")]
+    #[selector(name = "registerPlatform")]
     pub fn register_platform(
         &mut self,
         name: String,

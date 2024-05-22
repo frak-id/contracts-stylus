@@ -6,7 +6,7 @@ use tracing::info;
 use crate::{
     commands::{create_platform, deploy_contracts},
     errors::ScriptError,
-    utils::RpcProvider,
+    tx::client::RpcProvider,
 };
 
 /// Scripts for deploying & upgrading the Renegade Stylus contracts

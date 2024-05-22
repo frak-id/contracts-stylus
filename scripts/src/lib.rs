@@ -9,3 +9,14 @@ pub mod commands;
 pub mod constants;
 pub mod errors;
 pub mod utils;
+
+/// Our build utils
+pub mod build;
+
+/// Our deploy utils
+mod deploy;
+
+// Our output utils
+mod output_writer;
+
+pub mod tx;

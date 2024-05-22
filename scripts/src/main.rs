@@ -1,5 +1,7 @@
 use clap::Parser;
-use scripts::{cli::Cli, constants::DEFAULT_RPC, errors::ScriptError, utils::setup_client};
+use scripts::{
+    cli::Cli, constants::DEFAULT_RPC, errors::ScriptError, tx::client::create_rpc_provider,
+};
 
 #[tokio::main]
 async fn main() -> Result<(), ScriptError> {
@@ -15,7 +17,7 @@ async fn main() -> Result<(), ScriptError> {
     let rpc_url = rpc_url.unwrap_or_else(|| DEFAULT_RPC.to_string());
 
     // Build our RPC client with signer
-    let client = setup_client(&priv_key, &rpc_url).await?;
+    let client = create_rpc_provider(&priv_key, &rpc_url).await?;
 
     command.run(client, &rpc_url, &priv_key).await
 }
