@@ -53,7 +53,7 @@ impl Eip712Params for CoreParam {
 #[solidity_storage]
 #[entrypoint]
 pub struct ContentConsumptionContract {
-    // All the inhereted contracts
+    // All the inherited contracts
     #[borrow]
     platform: PlatformContract<CoreParam>,
     #[borrow]

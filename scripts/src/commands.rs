@@ -1,17 +1,23 @@
+use std::env;
+
 use alloy::{
-    primitives::{aliases::B32, keccak256, private::getrandom::getrandom, Address, B256},
-    providers::WalletProvider,
+    core::sol,
+    primitives::{aliases::B32, keccak256, private::getrandom::getrandom, Address, B256, U256},
+    providers::{Provider, WalletProvider},
+    signers::{k256::ecdsa::SigningKey, wallet::Wallet, Signer},
+    sol_types::eip712_domain,
 };
 use tracing::info;
 
 use crate::{
-    cli::{CreatePlatformArgs, DeployContractsArgs},
+    cli::{CreatePlatformArgs, DeployContractsArgs, SendTestCcuArgs},
     constants::OUTPUT_FILE,
     deploy::deploy::deploy_contract,
     errors::ScriptError,
     output_writer::{read_output_file, write_output_file, OutputKeys},
     tx::{
         client::RpcProvider,
+        reader::get_nonce_on_platform,
         sender::{send_create_platform, send_init_consumption_contract},
     },
 };
@@ -94,6 +100,71 @@ pub async fn create_platform(
         },
         tx_hash,
     )?;
+
+    Ok(())
+}
+
+/// Send some test CCU
+pub async fn send_test_ccu(args: SendTestCcuArgs, client: RpcProvider) -> Result<(), ScriptError> {
+    // Fetch contract address from json
+    let deployed_address =
+        read_output_file(OUTPUT_FILE, OutputKeys::Deployment { key: "consumption" })?
+            .parse::<Address>()
+            .unwrap();
+
+    // Parse provided args
+    let user_address = args.user.parse::<Address>().unwrap();
+    let platform_id = args.platform_id.parse::<B256>().unwrap();
+
+    info!(
+        "Crafting test CCU for user: {} and platform: {}",
+        user_address, platform_id
+    );
+
+    // Get the current user nonce on the given platform
+    let nonce =
+        get_nonce_on_platform(deployed_address, client.clone(), user_address, platform_id).await?;
+
+    info!("User nonce: {}", nonce);
+
+    sol! {
+        struct ValidateConsumption {
+            address user;
+            bytes32 platformId;
+            uint256 addedConsumption;
+            uint256 nonce;
+            uint256 deadline;
+        }
+    }
+
+    // Fetch the chain id
+    let chain_id = client.get_chain_id().await.unwrap();
+
+    let domain = eip712_domain! {
+        name: "ContentConsumption",
+        version: "0.0.1",
+        chain_id: chain_id,
+        verifying_contract: deployed_address,
+    };
+    let validate_consumption = ValidateConsumption {
+        user: user_address,
+        platformId: platform_id,
+        addedConsumption: U256::from(10u64),
+        nonce,
+        deadline: U256::MAX,
+    };
+
+    let signer = env::var("PRIVATE_KEY")
+        .unwrap()
+        .parse::<Wallet<SigningKey>>()
+        .map_err(|e| ScriptError::ClientInitialization(e.to_string()))?;
+
+    // Ask the client to sign the given typed data
+    let signed_result = signer
+        .sign_typed_data(&validate_consumption, &domain)
+        .await
+        .unwrap();
+    info!("Signed result: {:?}", signed_result.as_bytes());
 
     Ok(())
 }

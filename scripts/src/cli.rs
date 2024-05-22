@@ -4,7 +4,7 @@ use clap::{Args, Parser, Subcommand};
 use tracing::info;
 
 use crate::{
-    commands::{create_platform, deploy_contracts},
+    commands::{create_platform, deploy_contracts, send_test_ccu},
     errors::ScriptError,
     tx::client::RpcProvider,
 };
@@ -24,6 +24,8 @@ pub enum Command {
     DeployContracts(DeployContractsArgs),
     /// Create a new platform
     CreatePlatform(CreatePlatformArgs),
+    /// Send test CCU
+    SendTestCcu(SendTestCcuArgs),
 }
 
 impl Command {
@@ -36,8 +38,13 @@ impl Command {
                 Ok(())
             }
             Command::CreatePlatform(args) => {
-                info!("Setting up platform...");
+                info!("Creating up platform...");
                 create_platform(args, client).await?;
+                Ok(())
+            }
+            Command::SendTestCcu(args) => {
+                info!("Sending test ccu...");
+                send_test_ccu(args, client).await?;
                 Ok(())
             }
         }
@@ -55,9 +62,20 @@ pub struct CreatePlatformArgs {
     #[arg(short, long)]
     pub owner: String,
     /// Type of the content
-    #[arg(long)]
+    #[arg(short, long)]
     pub content_type: u32,
     /// Type of the content
     #[arg(long)]
     pub origin: String,
+}
+
+/// Setup some test platforms
+#[derive(Args)]
+pub struct SendTestCcuArgs {
+    /// Address of the user for which we will generate CCU
+    #[arg(short, long)]
+    pub user: String,
+    /// The id of the platform
+    #[arg(short, long)]
+    pub platform_id: String,
 }
