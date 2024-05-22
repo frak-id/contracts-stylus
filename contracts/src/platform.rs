@@ -1,4 +1,4 @@
-use alloc::{string::String, vec, vec::Vec};
+use alloc::string::String;
 use core::marker::PhantomData;
 
 use stylus_sdk::{
@@ -172,7 +172,7 @@ impl<T: PlatformParams> PlatformContract<T> {
     pub fn get_platform_metadata(
         &self,
         platform_id: FixedBytes<32>,
-    ) -> Result<PlatformMetadataType, Vec<u8>> {
+    ) -> Result<PlatformMetadataType, PlatformError> {
         // Get the ptr to the platform metadata
         let ptr = self.platform_data.get(platform_id);
         // Return every field we are interested in
@@ -183,5 +183,15 @@ impl<T: PlatformParams> PlatformContract<T> {
             ptr.content_type.get(),
             ptr.origin.get(),
         ))
+    }
+
+    /// Get a platform name
+    #[selector(name = "getPlatformName")]
+    #[view]
+    pub fn get_platform_name(&self, platform_id: FixedBytes<32>) -> Result<String, PlatformError> {
+        // Get the ptr to the platform metadata
+        let ptr = self.platform_data.get(platform_id);
+        // Return every field we are interested in
+        Ok(ptr.name.get_string())
     }
 }

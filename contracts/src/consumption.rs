@@ -41,7 +41,7 @@ pub struct ConsumptionContract<T: UserConsumptionParams> {
 
 /// Internal method stuff
 impl<T: UserConsumptionParams> ConsumptionContract<T> {
-    /// Update a user cosnumption by the given `added_consumption`
+    /// Update a user consumption by the given `added_consumption`
     pub fn update_user_consumption(
         &mut self,
         user: Address,

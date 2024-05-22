@@ -3,16 +3,12 @@ use alloy::{
     primitives::{aliases::B32, keccak256, Address, TxHash, U256},
     providers::Provider,
     rpc::types::eth::TransactionRequest,
-    sol_types::SolCall,
 };
 use tracing::info;
 
 use crate::{
     errors::ScriptError,
-    tx::{
-        abi::{getPlatformMetadataCall, initializeCall, registerPlatformCall},
-        client::RpcProvider,
-    },
+    tx::{abi::IContentConsumptionContract, client::RpcProvider},
 };
 
 /// Init consumption contracts
@@ -24,7 +20,7 @@ pub async fn send_init_consumption_contract(
     // Build the tx
     let tx_request = TransactionRequest::default()
         .to(contract)
-        .with_call(&initializeCall { owner })
+        .with_call(&IContentConsumptionContract::initializeCall { owner })
         .with_value(U256::from(0));
 
     // Send it
@@ -44,9 +40,9 @@ pub async fn send_init_consumption_contract(
     Ok(receipt.transaction_hash)
 }
 
-/// Create a new plateform
+/// Create a new platform
 pub async fn send_create_platform(
-    contract: Address,
+    contract_address: Address,
     name: String,
     origin: String,
     owner: Address,
@@ -56,29 +52,27 @@ pub async fn send_create_platform(
     // Perform a hash on the origin
     let origin_hash = keccak256(origin);
 
-    // Build the tx
-    let tx_request = TransactionRequest::default()
-        .to(contract)
-        .with_call(&registerPlatformCall {
-            name,
-            owner,
-            content_type,
-            origin: origin_hash,
-        })
-        .with_value(U256::from(0));
+    // Build our contract
+    let contract = IContentConsumptionContract::new(contract_address, client);
+
+    // Craft the register platform tx and send it
+    let register_platform_tx_builder =
+        contract.registerPlatform(name, owner, content_type, origin_hash);
 
     // Send it
-    let pending_tx = client
-        .send_transaction(tx_request)
+    let register_platform_tx = register_platform_tx_builder
+        .send()
         .await
         .map_err(|e| ScriptError::ContractInteraction(e.to_string()))?;
+
+    // Send it
     info!(
         "Pending create platform transaction... {}",
-        pending_tx.tx_hash()
+        &register_platform_tx.tx_hash()
     );
 
     // Wait for the transaction to be included.
-    let receipt = pending_tx
+    let receipt = register_platform_tx
         .get_receipt()
         .await
         .map_err(|e| ScriptError::ContractInteraction(e.to_string()))?;
@@ -88,20 +82,19 @@ pub async fn send_create_platform(
     );
 
     // Read the smart contract
-    let read_tx = TransactionRequest::default()
-        .to(contract)
-        .with_call(&getPlatformMetadataCall {
-            platform_id: keccak256(origin_hash),
-        })
-        .with_value(U256::from(0));
-    let read_result = client.call(&read_tx).await.unwrap();
-    info!("Platform metadata results: {:?}", read_result);
-    // Decode output
-    let metadata_output = getPlatformMetadataCall::abi_decode_returns(&read_result, false).unwrap();
-    info!(
-        "Platform metadata decoded: name: {:?}, owner: {:?}",
-        metadata_output._0, metadata_output._1
-    );
+    let platform_metadata = contract
+        .getPlatformName(keccak256(origin_hash))
+        .call()
+        .await
+        .map_err(|e| ScriptError::ContractInteraction(e.to_string()))?;
+    info!("OnChain platform name: {:?}", platform_metadata._0);
 
     Ok(receipt.transaction_hash)
 }
+
+/*
+TODO:
+ - Craft a command to extract domain etc
+ - Create a small typescript stuff that will try to push CCU
+
+ */

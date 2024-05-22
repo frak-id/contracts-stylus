@@ -79,7 +79,7 @@ pub async fn create_platform(
         origin,
         owner_address,
         B32::from(args.content_type),
-        client,
+        client.clone(),
     )
     .await?;
 
