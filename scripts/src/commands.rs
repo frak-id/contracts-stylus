@@ -1,6 +1,6 @@
 use alloy::{
     primitives::{aliases::B32, Address, B256, U256},
-    providers::{WalletProvider},
+    providers::WalletProvider,
 };
 use tracing::info;
 
@@ -14,7 +14,7 @@ use crate::{
         client::RpcProvider,
         reader::get_nonce_on_platform,
         sender::{push_ccu, send_create_platform, send_init_consumption_contract},
-        typed_data::get_validate_consumption_signature,
+        typed_data::TypedDataSigner,
     },
 };
 
@@ -125,17 +125,19 @@ pub async fn send_test_ccu(args: SendTestCcuArgs, client: RpcProvider) -> Result
     let deadline = U256::MAX;
     let added_consumption = U256::from(1);
 
+    // Get our typed data signer
+    let typed_data_signer = TypedDataSigner::new(client.clone(), deployed_address).await?;
+
     // Get the validate consumption signature
-    let signed_result = get_validate_consumption_signature(
-        deployed_address,
-        client.clone(),
-        user_address,
-        platform_id,
-        added_consumption,
-        nonce,
-        deadline,
-    )
-    .await?;
+    let signed_result = typed_data_signer
+        .get_validate_consumption_signature(
+            user_address,
+            platform_id,
+            added_consumption,
+            nonce,
+            deadline,
+        )
+        .await?;
     info!("Signed result: {:?}", signed_result.as_bytes());
 
     // Send the tx

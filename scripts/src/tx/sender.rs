@@ -8,10 +8,7 @@ use tracing::info;
 
 use crate::{
     errors::ScriptError,
-    tx::{
-        abi::IContentConsumptionContract, client::RpcProvider,
-        typed_data::get_register_platform_signature,
-    },
+    tx::{abi::IContentConsumptionContract, client::RpcProvider, typed_data::TypedDataSigner},
 };
 
 /// Init consumption contracts
@@ -55,17 +52,13 @@ pub async fn send_create_platform(
     // Build our contract
     let contract = IContentConsumptionContract::new(contract_address, client.clone());
 
+    let typed_data_signer = TypedDataSigner::new(client.clone(), contract_address).await?;
+
     // Build the signature
     let deadline = U256::MAX;
-    let signature = get_register_platform_signature(
-        contract_address,
-        client.clone(),
-        owner,
-        name.clone(),
-        origin.clone(),
-        deadline,
-    )
-    .await?;
+    let signature = typed_data_signer
+        .get_register_platform_signature(owner, name.clone(), origin.clone(), deadline)
+        .await?;
 
     // Craft the register platform tx and send it
     let register_platform_tx_builder = contract.registerPlatform(
