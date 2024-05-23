@@ -12,7 +12,7 @@ use crate::{
     output_writer::{read_output_file, write_output_file, OutputKeys},
     tx::{
         client::RpcProvider,
-        reader::get_nonce_on_platform,
+        reader::{get_nonce_on_platform, read_ccu_from_storage},
         sender::{push_ccu, send_create_platform, send_init_consumption_contract},
         typed_data::TypedDataSigner,
     },
@@ -109,6 +109,11 @@ pub async fn send_test_ccu(args: SendTestCcuArgs, client: RpcProvider) -> Result
     // Parse provided args
     let user_address = args.user.parse::<Address>().unwrap();
     let platform_id = args.platform_id.parse::<B256>().unwrap();
+
+    // Read the ccu from direct storage
+    let ccu_from_storage =
+        read_ccu_from_storage(deployed_address, client.clone(), user_address, platform_id).await?;
+    info!("CCU from storage: {}", ccu_from_storage);
 
     info!(
         "Crafting test CCU for user: {} and platform: {}",
