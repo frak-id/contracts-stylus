@@ -8,57 +8,62 @@ extern crate core;
 static ALLOC: mini_alloc::MiniAlloc = mini_alloc::MiniAlloc::INIT;
 use alloc::vec;
 
-use alloy_primitives::keccak256;
+use alloy_primitives::{keccak256, U64};
 use alloy_sol_types::SolType;
 use stylus_sdk::{
     alloy_primitives::{Address, FixedBytes, U256},
     alloy_sol_types::sol,
+    block,
     crypto::keccak,
     prelude::*,
-    storage::{StorageMap, StorageU256},
+    storage::{StorageMap, StorageU256, StorageU64},
 };
 
 // Utility functions and helpers used across the library
-mod consumption;
 mod errors;
 mod platform;
 mod utils;
 
-use consumption::{ConsumptionContract, UserConsumptionParams};
 use platform::{PlatformContract, PlatformParams};
 use utils::{
     eip712::{Eip712, Eip712Params},
     owned::{Owned, OwnedParams},
 };
 
-use crate::errors::{Errors, InvalidPlatformSignature, Unauthorized};
+use crate::errors::{Errors, InvalidPlatformSignature, TooCloseConsumption, Unauthorized};
 
 struct CoreParam;
 
 impl OwnedParams for CoreParam {}
 impl PlatformParams for CoreParam {}
-impl UserConsumptionParams for CoreParam {}
 impl Eip712Params for CoreParam {
     // Static fields
     const NAME: &'static str = "ContentConsumption";
     const VERSION: &'static str = "0.0.1";
 }
 
-// Define the global conntract storage
+/// Define the user consumption data on the given platform
+#[solidity_storage]
+pub struct UserConsumption {
+    ccu: StorageU256,
+    update_timestamp: StorageU64,
+}
+
+// Define the global contract storage
 #[solidity_storage]
 #[entrypoint]
 pub struct ContentConsumptionContract {
+    // The user activity storage (user => platform_id => UserConsumption)
+    user_consumptions: StorageMap<Address, StorageMap<FixedBytes<32>, UserConsumption>>,
+    // The consumption nonce for each user's
+    consumption_nonce: StorageMap<FixedBytes<32>, StorageU256>,
     // All the inherited contracts
     #[borrow]
     platform: PlatformContract<CoreParam>,
     #[borrow]
-    consumption: ConsumptionContract<CoreParam>,
-    #[borrow]
     eip712: Eip712<CoreParam>,
     #[borrow]
     owned: Owned<CoreParam>,
-    // The consumption nonce for each user's
-    consumption_nonce: StorageMap<FixedBytes<32>, StorageU256>,
 }
 
 // Private helper methods
@@ -74,7 +79,7 @@ impl ContentConsumptionContract {
 
 /// Declare that `ContentConsumptionContract` is a contract with the following external methods.
 #[external]
-#[inherit(PlatformContract<CoreParam>, ConsumptionContract<CoreParam>, Owned<CoreParam>, Eip712<CoreParam>)]
+#[inherit(PlatformContract<CoreParam>, Owned<CoreParam>, Eip712<CoreParam>)]
 impl ContentConsumptionContract {
     /* -------------------------------------------------------------------------- */
     /*                                 Constructor                                */
@@ -157,8 +162,27 @@ impl ContentConsumptionContract {
             .set(current_nonce + U256::from(1));
 
         // Push the new CCU
-        self.consumption
-            .update_user_consumption(user, platform_id, added_consumption)?;
+
+        // Get the current state
+        let mut storage_ptr = self.user_consumptions.setter(user);
+        let mut storage_ptr = storage_ptr.setter(platform_id);
+        let last_update = storage_ptr.update_timestamp.get().to::<u64>();
+        let last_ccu = storage_ptr.ccu.get();
+
+        // Get the current timestamp
+        let current_timestamp = block::timestamp();
+
+        // If last update was less than one minute ago, abort
+        if (last_update + 60) > current_timestamp {
+            return Err(Errors::TooCloseConsumption(TooCloseConsumption {}));
+        }
+
+        // Update the ccu amount
+        storage_ptr.ccu.set(last_ccu + added_consumption);
+        // Update the update timestamp
+        storage_ptr
+            .update_timestamp
+            .set(U64::from(current_timestamp));
 
         // Return the success
         Ok(())
@@ -215,8 +239,26 @@ impl ContentConsumptionContract {
         Ok(platform_id)
     }
 
-    /*
-     * TODO: -> Option to handle CCU
-     *  -> Pushing new CCU should receive base CCU data (new amount), and check against a BLS signature if the owner of the platform allowed it
-     */
+    /* -------------------------------------------------------------------------- */
+    /*                          Consumption read methods                          */
+    /* -------------------------------------------------------------------------- */
+
+    /// Get the user consumption on a content
+    #[selector(name = "getUserConsumption")]
+    #[view]
+    pub fn get_user_consumption(
+        &self,
+        user: Address,
+        platform_id: FixedBytes<32>,
+    ) -> Result<(U256, U256), Vec<u8>> {
+        // Get the ptr to the platform metadata
+        let storage_ptr = self.user_consumptions.get(user);
+        let storage_ptr = storage_ptr.get(platform_id);
+        // Return every field we are interested in
+        Ok((
+            // CCU + update time
+            storage_ptr.ccu.get(),
+            U256::from(storage_ptr.update_timestamp.get()),
+        ))
+    }
 }
