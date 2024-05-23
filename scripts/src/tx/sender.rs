@@ -1,6 +1,6 @@
 use alloy::{
     network::TransactionBuilder,
-    primitives::{aliases::B32, keccak256, Address, TxHash, U256},
+    primitives::{aliases::B32, Address, FixedBytes, TxHash, B256, U256},
     providers::Provider,
     rpc::types::eth::TransactionRequest,
 };
@@ -8,7 +8,10 @@ use tracing::info;
 
 use crate::{
     errors::ScriptError,
-    tx::{abi::IContentConsumptionContract, client::RpcProvider},
+    tx::{
+        abi::IContentConsumptionContract, client::RpcProvider,
+        typed_data::get_register_platform_signature,
+    },
 };
 
 /// Init consumption contracts
@@ -48,16 +51,40 @@ pub async fn send_create_platform(
     owner: Address,
     content_type: B32,
     client: RpcProvider,
-) -> Result<TxHash, ScriptError> {
-    // Perform a hash on the origin
-    let origin_hash = keccak256(origin);
-
+) -> Result<(FixedBytes<32>, TxHash), ScriptError> {
     // Build our contract
-    let contract = IContentConsumptionContract::new(contract_address, client);
+    let contract = IContentConsumptionContract::new(contract_address, client.clone());
+
+    // Build the signature
+    let deadline = U256::MAX;
+    let signature = get_register_platform_signature(
+        contract_address,
+        client.clone(),
+        owner,
+        name.clone(),
+        origin.clone(),
+        deadline,
+    )
+    .await?;
 
     // Craft the register platform tx and send it
-    let register_platform_tx_builder =
-        contract.registerPlatform(name, owner, content_type, origin_hash);
+    let register_platform_tx_builder = contract.registerPlatform(
+        name,
+        origin,
+        owner,
+        content_type,
+        deadline,
+        signature.v().y_parity_byte(),
+        signature.r().into(),
+        signature.s().into(),
+    );
+
+    // Predicate the platform id
+    let register_platform_return = register_platform_tx_builder
+        .call()
+        .await
+        .map_err(|e| ScriptError::ContractInteraction(e.to_string()))?;
+    let platform_id = register_platform_return._0;
 
     // Send it
     let register_platform_tx = register_platform_tx_builder
@@ -67,8 +94,9 @@ pub async fn send_create_platform(
 
     // Send it
     info!(
-        "Pending create platform transaction... {}",
-        &register_platform_tx.tx_hash()
+        "Pending create platform transaction... {}, estimated platform id: {:?}",
+        &register_platform_tx.tx_hash(),
+        platform_id
     );
 
     // Wait for the transaction to be included.
@@ -83,7 +111,7 @@ pub async fn send_create_platform(
 
     // Read the smart contract
     let platform_name = contract
-        .getPlatformName(keccak256(origin_hash))
+        .getPlatformName(platform_id)
         .call()
         .await
         .map_err(|e| ScriptError::ContractInteraction(e.to_string()))?;
@@ -91,20 +119,69 @@ pub async fn send_create_platform(
 
     // Read the smart contract
     let platform_metadata = contract
-        .getPlatformMetadata(keccak256(origin_hash))
+        .getPlatformMetadata(platform_id)
         .call()
         .await
         .map_err(|e| ScriptError::ContractInteraction(e.to_string()))?;
     info!(
-        "OnChain platform metadata: owner: {:?}, content type: {:?}, origin {:?}",
-        platform_metadata._0, platform_metadata._1, platform_metadata._2
+        "OnChain platform metadata: owner: {:?}, content type: {:?}",
+        platform_metadata._0, platform_metadata._1
+    );
+
+    Ok((platform_id, receipt.transaction_hash))
+}
+
+/// Send CCU on chain
+pub async fn push_ccu(
+    contract_address: Address,
+    user: Address,
+    platform_id: B256,
+    consumption: U256,
+    deadline: U256,
+    v: u8,
+    r: U256,
+    s: U256,
+    client: RpcProvider,
+) -> Result<TxHash, ScriptError> {
+    // Build our contract
+    let contract = IContentConsumptionContract::new(contract_address, client);
+
+    // Craft the register platform tx and send it
+    let send_ccu_tx_builder = contract.pushCcu(
+        user,
+        platform_id,
+        consumption,
+        deadline,
+        v,
+        r.into(),
+        s.into(),
+    );
+
+    // Test a call first
+    let send_ccu_call = send_ccu_tx_builder
+        .call_raw()
+        .await
+        .map_err(|e| ScriptError::ContractInteraction(e.to_string()))?;
+    info!("Push CCU call: {:?}", send_ccu_call);
+
+    // Then send it
+    let send_ccu_tx = send_ccu_tx_builder
+        .send()
+        .await
+        .map_err(|e| ScriptError::ContractInteraction(e.to_string()))?;
+
+    // Send it
+    info!("Push CCU transaction... {}", &send_ccu_tx.tx_hash());
+
+    // Wait for the transaction to be included.
+    let receipt = send_ccu_tx
+        .get_receipt()
+        .await
+        .map_err(|e| ScriptError::ContractInteraction(e.to_string()))?;
+    info!(
+        "Push CCU tx done on block: {}",
+        receipt.block_number.unwrap()
     );
 
     Ok(receipt.transaction_hash)
 }
-
-/*
-TODO:
- - Craft a command to extract domain etc
- - Create a small typescript stuff that will try to push CCU
- */

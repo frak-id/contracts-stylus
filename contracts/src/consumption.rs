@@ -3,22 +3,14 @@ use core::marker::PhantomData;
 
 use stylus_sdk::{
     alloy_primitives::{Address, FixedBytes, U256, U64},
-    alloy_sol_types::sol,
     block::{self},
     prelude::*,
     storage::{StorageMap, StorageU256, StorageU64},
 };
 
-pub trait UserConsumptionParams {}
+use crate::errors::{Errors, TooCloseConsumption};
 
-// Define events and errors in the contract
-sol! {
-    error TooCloseConsumption();
-}
-#[derive(SolidityError)]
-pub enum ConsumptionError {
-    TooCloseConsumption(TooCloseConsumption),
-}
+pub trait UserConsumptionParams {}
 
 /// Define the user consumption data on the given platform
 #[solidity_storage]
@@ -26,10 +18,6 @@ pub struct UserConsumption {
     ccu: StorageU256,
     update_timestamp: StorageU64,
 }
-
-/// Define the type of user consumption, in an ideal world, it should be a sol type
-/// TODO: When alloy-rs is updated on the stylus SDK, use a sol! macro to define the type
-type UserConsumptionType = (U256, U256);
 
 // Define the global consumption contract
 #[solidity_storage]
@@ -47,7 +35,7 @@ impl<T: UserConsumptionParams> ConsumptionContract<T> {
         user: Address,
         platform_id: FixedBytes<32>,
         added_consumption: U256,
-    ) -> Result<(), ConsumptionError> {
+    ) -> Result<(), Errors> {
         // Get the current state
         let mut storage_ptr = self.user_consumptions.setter(user);
         let mut storage_ptr = storage_ptr.setter(platform_id);
@@ -59,9 +47,7 @@ impl<T: UserConsumptionParams> ConsumptionContract<T> {
 
         // If last update was less than one minute ago, abort
         if (last_update + 60) > current_timestamp {
-            return Err(ConsumptionError::TooCloseConsumption(
-                TooCloseConsumption {},
-            ));
+            return Err(Errors::TooCloseConsumption(TooCloseConsumption {}));
         }
 
         // Update the ccu amount
@@ -90,7 +76,7 @@ impl<T: UserConsumptionParams> ConsumptionContract<T> {
         &self,
         user: Address,
         platform_id: FixedBytes<32>,
-    ) -> Result<UserConsumptionType, Vec<u8>> {
+    ) -> Result<(U256, U256), Vec<u8>> {
         // Get the ptr to the platform metadata
         let storage_ptr = self.user_consumptions.get(user);
         let storage_ptr = storage_ptr.get(platform_id);

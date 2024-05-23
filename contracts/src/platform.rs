@@ -8,36 +8,27 @@ use stylus_sdk::{
     evm,
     msg::{self},
     prelude::*,
-    storage::{StorageAddress, StorageB256, StorageB32, StorageMap, StorageString},
+    storage::{StorageAddress, StorageB32, StorageMap, StorageString},
+};
+
+use crate::errors::{
+    Errors, InvalidMetadata, NotPlatformOwner, PlatformAlreadyExist, PlatformDontExist,
 };
 
 pub trait PlatformParams {}
 
 // Define events and errors in the contract
 sol! {
-    event PlatformRegistered(bytes32 indexed platformId, address owner, bytes4 contentType, bytes32 origin);
-
-    error NotPlatformOwner();
-    error PlatformAlreadyExist();
-    error PlatformDontExist();
-    error InvalidMetadata();
-}
-
-#[derive(SolidityError)]
-pub enum PlatformError {
-    NotPlatformOwner(NotPlatformOwner),
-    PlatformAlreadyExist(PlatformAlreadyExist),
-    PlatformDontExist(PlatformDontExist),
-    InvalidMetadata(InvalidMetadata),
+    event PlatformRegistered(bytes32 indexed platformId, address owner, bytes4 contentType);
 }
 
 /// Define the platform metadata
 #[solidity_storage]
 pub struct PlatformMetadata {
     name: StorageString,
+    origin: StorageString,
     owner: StorageAddress,
     content_type: StorageB32,
-    origin: StorageB256,
 }
 
 // Define the global contract storage
@@ -60,20 +51,16 @@ impl<T: PlatformParams> PlatformContract<T> {
     }
 
     /// Only allow the call for an existing platform
-    pub fn only_existing_platform(&self, platform_id: FixedBytes<32>) -> Result<(), PlatformError> {
+    pub fn only_existing_platform(&self, platform_id: FixedBytes<32>) -> Result<(), Errors> {
         if self.is_not_existent_platform(platform_id) {
-            return Err(PlatformError::PlatformDontExist(PlatformDontExist {}));
+            return Err(Errors::PlatformDontExist(PlatformDontExist {}));
         }
         Ok(())
     }
 
     /// Get the platform owner
-    pub fn get_platform_owner(
-        &self,
-        platform_id: FixedBytes<32>,
-    ) -> Result<Address, PlatformError> {
-        self.only_existing_platform(platform_id)?;
-        Ok(self.platform_data.get(platform_id).owner.get())
+    pub fn get_platform_owner(&self, platform_id: FixedBytes<32>) -> Address {
+        self.platform_data.get(platform_id).owner.get()
     }
 
     /* -------------------------------------------------------------------------- */
@@ -85,35 +72,34 @@ impl<T: PlatformParams> PlatformContract<T> {
     pub fn create_platform(
         &mut self,
         name: String,
+        origin: String,
         owner: Address,
         content_type: FixedBytes<4>,
-        origin: FixedBytes<32>,
-    ) -> Result<FixedBytes<32>, PlatformError> {
+    ) -> Result<FixedBytes<32>, Errors> {
         let platform_id = keccak(&origin);
         // Ensure the platform doesn't already exist
         if !self.is_not_existent_platform(platform_id) {
-            return Err(PlatformError::PlatformAlreadyExist(PlatformAlreadyExist {}));
+            return Err(Errors::PlatformAlreadyExist(PlatformAlreadyExist {}));
         }
 
         // Ensure name and owner aren't empty
         if name.is_empty() | owner.is_zero() {
-            return Err(PlatformError::InvalidMetadata(InvalidMetadata {}));
+            return Err(Errors::InvalidMetadata(InvalidMetadata {}));
         }
 
         // Get the right metadata setter
         let mut metadata = self.platform_data.setter(platform_id);
         // Create the new platform metadata
         metadata.name.set_str(name);
+        metadata.origin.set_str(origin);
         metadata.owner.set(owner);
         metadata.content_type.set(content_type);
-        metadata.origin.set(origin);
 
         // Emit the event
         evm::log(PlatformRegistered {
             platformId: platform_id.0,
             owner,
             contentType: content_type.0,
-            origin: origin.0,
         });
 
         // Return the created platform_id
@@ -135,18 +121,18 @@ impl<T: PlatformParams> PlatformContract<T> {
         platform_id: FixedBytes<32>,
         name: String,
         owner: Address,
-    ) -> Result<(), PlatformError> {
+    ) -> Result<(), Errors> {
         self.only_existing_platform(platform_id)?;
 
         let caller = msg::sender();
         // Ensure the caller is the owner
         if !self.platform_data.get(platform_id).owner.get().eq(&caller) {
-            return Err(PlatformError::NotPlatformOwner(NotPlatformOwner {}));
+            return Err(Errors::NotPlatformOwner(NotPlatformOwner {}));
         }
 
         // Ensure name isn't empty
         if name.is_empty() | owner.is_zero() {
-            return Err(PlatformError::InvalidMetadata(InvalidMetadata {}));
+            return Err(Errors::InvalidMetadata(InvalidMetadata {}));
         }
 
         // Get the right metadata setter
@@ -169,7 +155,7 @@ impl<T: PlatformParams> PlatformContract<T> {
     pub fn get_platform_metadata(
         &self,
         platform_id: FixedBytes<32>,
-    ) -> Result<(Address, FixedBytes<4>, FixedBytes<32>), PlatformError> {
+    ) -> Result<(Address, FixedBytes<4>), Errors> {
         // Get the ptr to the platform metadata
         let ptr = self.platform_data.get(platform_id);
         // Return every field we are interested in
@@ -177,17 +163,22 @@ impl<T: PlatformParams> PlatformContract<T> {
             // Classical metadata
             ptr.owner.get(),
             ptr.content_type.get(),
-            ptr.origin.get(),
         ))
     }
 
     /// Get a platform name
     #[selector(name = "getPlatformName")]
     #[view]
-    pub fn get_platform_name(&self, platform_id: FixedBytes<32>) -> Result<String, PlatformError> {
-        // Get the ptr to the platform metadata
+    pub fn get_platform_name(&self, platform_id: FixedBytes<32>) -> Result<String, Errors> {
         let ptr = self.platform_data.get(platform_id);
-        // Return every field we are interested in
         Ok(ptr.name.get_string())
+    }
+
+    /// Get a platform origin
+    #[selector(name = "getPlatformOrigin")]
+    #[view]
+    pub fn get_platform_origin(&self, platform_id: FixedBytes<32>) -> Result<String, Errors> {
+        let ptr = self.platform_data.get(platform_id);
+        Ok(ptr.origin.get_string())
     }
 }

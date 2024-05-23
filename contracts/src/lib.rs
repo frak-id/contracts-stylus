@@ -9,6 +9,7 @@ static ALLOC: mini_alloc::MiniAlloc = mini_alloc::MiniAlloc::INIT;
 use alloc::vec;
 
 use alloy_primitives::keccak256;
+use alloy_sol_types::SolType;
 use stylus_sdk::{
     alloy_primitives::{Address, FixedBytes, U256},
     alloy_sol_types::sol,
@@ -19,6 +20,7 @@ use stylus_sdk::{
 
 // Utility functions and helpers used across the library
 mod consumption;
+mod errors;
 mod platform;
 mod utils;
 
@@ -29,14 +31,7 @@ use utils::{
     owned::{Owned, OwnedParams},
 };
 
-// Define events and errors in the contract
-sol! {
-    error InvalidPlatformSignature();
-}
-#[derive(SolidityError)]
-pub enum ContentConsumptionError {
-    InvalidPlatformSignature(InvalidPlatformSignature),
-}
+use crate::errors::{Errors, InvalidPlatformSignature, Unauthorized};
 
 struct CoreParam;
 
@@ -89,7 +84,7 @@ impl ContentConsumptionContract {
     /// TODO: No constructor poossible atm, so going with init method called during contract creation via multicall
     /// See: https://github.com/OffchainLabs/stylus-sdk-rs/issues/99
     #[selector(name = "initialize")]
-    pub fn initialize(&mut self, owner: Address) -> Result<(), Vec<u8>> {
+    pub fn initialize(&mut self, owner: Address) -> Result<(), Errors> {
         // Init the eip712 domain
         self.eip712.initialize();
         // Init the contract with the given owner
@@ -121,42 +116,45 @@ impl ContentConsumptionContract {
         v: u8,
         r: FixedBytes<32>,
         s: FixedBytes<32>,
-    ) -> Result<(), Vec<u8>> {
+    ) -> Result<(), Errors> {
+        // No need to check that te platform exists, as the consumption will be rejected
+        //  if the recovered address is zero, and if the owner doesn't match the recovered address
+
         // Get the user consumption nonce
         let nonce_key = Self::user_to_platform_nonce_key(user, platform_id);
         let current_nonce = self.consumption_nonce.get(nonce_key);
 
         // Ensure that the caller is the owner of the platform
-        let platform_owner = self.platform.get_platform_owner(platform_id)?;
+        let platform_owner = self.platform.get_platform_owner(platform_id);
 
         // Rebuild the signed data
-        // TODO: Should also have:
-        // - content_type (to ensure the content is the right one)
-        // Could we switch to a vector here to ease the manipulation?
-        let mut struct_hash = [0u8; 192];
-        struct_hash[..32].copy_from_slice(&keccak(b"ValidateConsumption(address user,bytes32 platformId,uint256 addedConsumption,uint256 nonce,uint256 deadline)")[..]);
-        struct_hash[32..64].copy_from_slice(&user[..]);
-        struct_hash[64..96].copy_from_slice(&platform_id[..]);
-        struct_hash[96..128].copy_from_slice(&added_consumption.to_be_bytes_vec()[..]);
-        struct_hash[128..160].copy_from_slice(&current_nonce.to_be_bytes_vec()[..]);
-        struct_hash[160..192].copy_from_slice(&deadline.to_be_bytes_vec()[..]);
+        let struct_hash = keccak(
+            <sol! { (bytes32, address, bytes32, uint256, uint256, uint256) }>::encode(&(
+                keccak(b"ValidateConsumption(address user,bytes32 platformId,uint256 addedConsumption,uint256 nonce,uint256 deadline)").0,
+                user,
+                platform_id.0,
+                added_consumption,
+                current_nonce,
+                deadline,
+            )),
+        );
 
         // Do an ecdsa recovery check on the signature
         let recovered_address = self
             .eip712
-            .recover_typed_data_signer(&struct_hash, v, r, s)?;
+            .recover_typed_data_signer(struct_hash, v, r, s)?;
 
         // Ensure the platform owner has signed the consumption
         if recovered_address.is_zero() || recovered_address != platform_owner {
-            return Err(ContentConsumptionError::InvalidPlatformSignature(
+            return Err(Errors::InvalidPlatformSignature(
                 InvalidPlatformSignature {},
-            )
-            .into());
+            ));
         }
 
         // Increase current nonce
         self.consumption_nonce
-            .insert(nonce_key, current_nonce + U256::from(1));
+            .setter(nonce_key)
+            .set(current_nonce + U256::from(1));
 
         // Push the new CCU
         self.consumption
@@ -175,18 +173,43 @@ impl ContentConsumptionContract {
     pub fn register_platform(
         &mut self,
         name: String,
+        origin: String,
         owner: Address,
         content_type: FixedBytes<4>,
-        origin: FixedBytes<32>,
-    ) -> Result<FixedBytes<32>, Vec<u8>> {
+        deadline: U256,
+        v: u8,
+        r: FixedBytes<32>,
+        s: FixedBytes<32>,
+    ) -> Result<FixedBytes<32>, Errors> {
         // Ensure that the caller is the owner
-        // TODO: Idk why, this statement make the whole code fail
-        // self.owned.only_owner()?;
+        // TODO: Idk why, but a call to `self.owned.only_owner()` is not working
+        // TODO: msg::sender() return 0 on v0.5.0, can't compile on 0.4.3
+
+        // Rebuild the signed data
+        let struct_hash = keccak(
+            <sol! { (bytes32, address, bytes32, bytes32, uint256) }>::encode(&(
+                keccak(b"CreateNewPlatform(address owner,bytes32 name,bytes32 origin,uint256 deadline)").0,
+                owner,
+                keccak256(&name.as_bytes()).0,
+                keccak256(&origin.as_bytes()).0,
+                deadline,
+            )),
+        );
+
+        // Do an ecdsa recovery check on the signature
+        let recovered_address = self
+            .eip712
+            .recover_typed_data_signer(struct_hash, v, r, s)?;
+
+        // Ensure it's the owner who signed the platform creation
+        if recovered_address.is_zero() || recovered_address != self.owned.get_owner() {
+            return Err(Errors::Unauthorized(Unauthorized {}));
+        }
 
         // Create the platform
         let platform_id = self
             .platform
-            .create_platform(name, owner, content_type, origin)?;
+            .create_platform(name, origin, owner, content_type)?;
 
         // Return the success and the created platform id
         Ok(platform_id)
