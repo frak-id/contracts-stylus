@@ -1,5 +1,6 @@
 //! Definitions of CLI arguments and commands for deploy scripts
 
+use alloy::primitives::U256;
 use clap::{Args, Parser, Subcommand};
 use tracing::info;
 
@@ -63,7 +64,7 @@ pub struct CreatePlatformArgs {
     pub owner: String,
     /// Type of the content
     #[arg(short, long)]
-    pub content_type: u32,
+    pub content_type: U256,
     /// Type of the content
     #[arg(long)]
     pub origin: String,

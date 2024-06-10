@@ -1,5 +1,5 @@
 use alloy::{
-    primitives::{aliases::B32, Address, B256, U256},
+    primitives::{Address, B256, U256},
     providers::WalletProvider,
 };
 use tracing::info;
@@ -63,22 +63,20 @@ pub async fn create_platform(
             .parse::<Address>()
             .unwrap();
 
-    // Update args.origin to also include a random number
-    //let mut buf = [0u8; 32];
-    //getrandom(&mut buf).unwrap();
-    //let origin = format!("{}-{}", args.origin, B256::from(buf));
+    // Extract platform origin
     let origin = args.origin;
 
     // Parse the owner address
     let owner_address = args.owner.parse::<Address>().unwrap();
 
     // Send the tx
+    info!("Sending create platform tx..., content type: {}", args.content_type);
     let (platform_id, tx_hash) = send_create_platform(
         deployed_address,
-        "test".to_string(),
+        origin.clone(),
         origin,
         owner_address,
-        B32::from(args.content_type),
+        B256::from(args.content_type),
         client.clone(),
     )
     .await?;

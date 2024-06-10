@@ -8,7 +8,7 @@ use stylus_sdk::{
     evm,
     msg::{self},
     prelude::*,
-    storage::{StorageAddress, StorageB32, StorageMap, StorageString},
+    storage::{StorageAddress, StorageB256, StorageMap, StorageString},
 };
 
 use crate::errors::{
@@ -19,7 +19,7 @@ pub trait PlatformParams {}
 
 // Define events and errors in the contract
 sol! {
-    event PlatformRegistered(bytes32 indexed platformId, address owner, bytes4 contentType);
+    event PlatformRegistered(bytes32 indexed platformId, address owner, bytes32 contentType);
 }
 
 /// Define the platform metadata
@@ -28,7 +28,8 @@ pub struct PlatformMetadata {
     name: StorageString,
     origin: StorageString,
     owner: StorageAddress,
-    content_type: StorageB32,
+    /// @dev Content type is a bytes, with single bit representing a type
+    content_types: StorageB256,
 }
 
 // Define the global contract storage
@@ -74,7 +75,7 @@ impl<T: PlatformParams> PlatformContract<T> {
         name: String,
         origin: String,
         owner: Address,
-        content_type: FixedBytes<4>,
+        content_types: FixedBytes<32>,
     ) -> Result<FixedBytes<32>, Errors> {
         let platform_id = keccak(&origin);
         // Ensure the platform doesn't already exist
@@ -93,13 +94,13 @@ impl<T: PlatformParams> PlatformContract<T> {
         metadata.name.set_str(name);
         metadata.origin.set_str(origin);
         metadata.owner.set(owner);
-        metadata.content_type.set(content_type);
+        metadata.content_types.set(content_types);
 
         // Emit the event
         evm::log(PlatformRegistered {
             platformId: platform_id.0,
             owner,
-            contentType: content_type.0,
+            contentType: content_types.0,
         });
 
         // Return the created platform_id
@@ -121,6 +122,7 @@ impl<T: PlatformParams> PlatformContract<T> {
         platform_id: FixedBytes<32>,
         name: String,
         owner: Address,
+        content_types: FixedBytes<32>,
     ) -> Result<(), Errors> {
         self.only_existing_platform(platform_id)?;
 
@@ -140,6 +142,7 @@ impl<T: PlatformParams> PlatformContract<T> {
         // Create the new platform metadata
         metadata.name.set_str(name);
         metadata.owner.set(owner);
+        metadata.content_types.set(content_types);
         // Return success
         Ok(())
     }
@@ -155,14 +158,14 @@ impl<T: PlatformParams> PlatformContract<T> {
     pub fn get_platform_metadata(
         &self,
         platform_id: FixedBytes<32>,
-    ) -> Result<(Address, FixedBytes<4>), Errors> {
+    ) -> Result<(Address, FixedBytes<32>), Errors> {
         // Get the ptr to the platform metadata
         let ptr = self.platform_data.get(platform_id);
         // Return every field we are interested in
         Ok((
             // Classical metadata
             ptr.owner.get(),
-            ptr.content_type.get(),
+            ptr.content_types.get(),
         ))
     }
 

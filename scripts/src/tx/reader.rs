@@ -2,6 +2,7 @@ use alloy::{
     primitives::{keccak256, Address, StorageValue, B256, U256},
     providers::Provider,
 };
+use log::info;
 
 use crate::{
     errors::ScriptError,
@@ -70,6 +71,16 @@ pub async fn read_ccu_from_storage(
         .get_storage_at(contract_address, storage_ptr.into())
         .await
         .map_err(|e| ScriptError::ContractInteraction(e.to_string()))?;
+
+    info!("Storage ptr: {:?}", storage_ptr);
+
+    // Get a storage proof
+    let account_proof = client
+        .get_proof(contract_address, [storage_ptr.into()].into())
+        .await
+        .map_err(|e| ScriptError::ContractInteraction(e.to_string()))?;
+
+    info!("Storage proof: {:?}", account_proof);
 
     Ok(storage)
 }

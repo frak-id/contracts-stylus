@@ -199,7 +199,7 @@ impl ContentConsumptionContract {
         name: String,
         origin: String,
         owner: Address,
-        content_type: FixedBytes<4>,
+        content_type: FixedBytes<32>,
         deadline: U256,
         v: u8,
         r: FixedBytes<32>,

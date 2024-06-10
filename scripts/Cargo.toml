@@ -7,7 +7,7 @@ homepage = "https://github.com/frak-id/contracts-stylus"
 repository = "https://github.com/frak-id/contracts-stylus"
 
 [dependencies]
-alloy = { git = "https://github.com/alloy-rs/alloy", rev = "1ee5ace", features = [
+alloy = { git = "https://github.com/alloy-rs/alloy", rev = "5814686", features = [
     "contract",
     "sol-types",
     "network",

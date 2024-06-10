@@ -1,8 +1,8 @@
 use alloy::{
     network::TransactionBuilder,
-    primitives::{aliases::B32, Address, FixedBytes, TxHash, B256, U256},
+    primitives::{Address, FixedBytes, TxHash, B256, U256},
     providers::Provider,
-    rpc::types::eth::TransactionRequest,
+    rpc::types::TransactionRequest,
 };
 use tracing::info;
 
@@ -46,7 +46,7 @@ pub async fn send_create_platform(
     name: String,
     origin: String,
     owner: Address,
-    content_type: B32,
+    content_type: B256,
     client: RpcProvider,
 ) -> Result<(FixedBytes<32>, TxHash), ScriptError> {
     // Build our contract
