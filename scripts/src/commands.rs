@@ -5,15 +5,15 @@ use alloy::{
 use tracing::info;
 
 use crate::{
-    cli::{CreatePlatformArgs, DeployContractsArgs, SendTestCcuArgs},
+    cli::{CreatePlatformArgs, DeployContractsArgs, SendTestCcuArgs, SetValidatorArgs},
     constants::OUTPUT_FILE,
     deploy::deploy::deploy_contract,
     errors::ScriptError,
     output_writer::{read_output_file, write_output_file, OutputKeys},
     tx::{
         client::RpcProvider,
-        reader::{get_nonce_on_platform, read_ccu_from_storage},
-        sender::{push_ccu, send_create_platform, send_init_consumption_contract},
+        reader::read_ccu_from_storage,
+        sender::{push_ccu, send_create_platform, send_init_consumption_contract, set_validator},
         typed_data::TypedDataSigner,
     },
 };
@@ -41,7 +41,7 @@ pub async fn deploy_contracts(
 
     // Init the contracts
     info!("Init contracts...");
-    let deployer_address = client.signer().default_signer().address();
+    let deployer_address = client.wallet().default_signer().address();
     let tx_hash =
         send_init_consumption_contract(contract_address, deployer_address, client.clone()).await?;
     write_output_file(
@@ -70,7 +70,10 @@ pub async fn create_platform(
     let owner_address = args.owner.parse::<Address>().unwrap();
 
     // Send the tx
-    info!("Sending create platform tx..., content type: {}", args.content_type);
+    info!(
+        "Sending create platform tx..., content type: {}",
+        args.content_type
+    );
     let (platform_id, tx_hash) = send_create_platform(
         deployed_address,
         origin.clone(),
@@ -118,12 +121,6 @@ pub async fn send_test_ccu(args: SendTestCcuArgs, client: RpcProvider) -> Result
         user_address, platform_id
     );
 
-    // Get the current user nonce on the given platform
-    let nonce =
-        get_nonce_on_platform(deployed_address, client.clone(), user_address, platform_id).await?;
-
-    info!("User nonce: {}", nonce);
-
     // Build deadline + added consumption
     let deadline = U256::MAX;
     let added_consumption = U256::from(1);
@@ -133,13 +130,7 @@ pub async fn send_test_ccu(args: SendTestCcuArgs, client: RpcProvider) -> Result
 
     // Get the validate consumption signature
     let signed_result = typed_data_signer
-        .get_validate_consumption_signature(
-            user_address,
-            platform_id,
-            added_consumption,
-            nonce,
-            deadline,
-        )
+        .get_validate_consumption_signature(user_address, platform_id, added_consumption, deadline)
         .await?;
     info!("Signed result: {:?}", signed_result.as_bytes());
 
@@ -153,6 +144,32 @@ pub async fn send_test_ccu(args: SendTestCcuArgs, client: RpcProvider) -> Result
         signed_result.v().y_parity_byte(),
         signed_result.r(),
         signed_result.s(),
+        client.clone(),
+    )
+    .await?;
+
+    Ok(())
+}
+
+/// Push a new validator
+pub async fn send_set_validator(
+    args: SetValidatorArgs,
+    client: RpcProvider,
+) -> Result<(), ScriptError> {
+    // Fetch contract address from json
+    let deployed_address =
+        read_output_file(OUTPUT_FILE, OutputKeys::Deployment { key: "consumption" })?
+            .parse::<Address>()
+            .unwrap();
+
+    // Parse provided args
+    let validator_address = args.validator.parse::<Address>().unwrap();
+
+    // Send the tx
+    set_validator(
+        deployed_address,
+        validator_address,
+        args.allowed,
         client.clone(),
     )
     .await?;

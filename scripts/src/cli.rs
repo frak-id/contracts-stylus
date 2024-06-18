@@ -5,7 +5,7 @@ use clap::{Args, Parser, Subcommand};
 use tracing::info;
 
 use crate::{
-    commands::{create_platform, deploy_contracts, send_test_ccu},
+    commands::{create_platform, deploy_contracts, send_set_validator, send_test_ccu},
     errors::ScriptError,
     tx::client::RpcProvider,
 };
@@ -27,6 +27,8 @@ pub enum Command {
     CreatePlatform(CreatePlatformArgs),
     /// Send test CCU
     SendTestCcu(SendTestCcuArgs),
+    /// Set a validator
+    SetValidator(SetValidatorArgs),
 }
 
 impl Command {
@@ -46,6 +48,11 @@ impl Command {
             Command::SendTestCcu(args) => {
                 info!("Sending test ccu...");
                 send_test_ccu(args, client).await?;
+                Ok(())
+            }
+            Command::SetValidator(args) => {
+                info!("Setting validator...");
+                send_set_validator(args, client).await?;
                 Ok(())
             }
         }
@@ -79,4 +86,15 @@ pub struct SendTestCcuArgs {
     /// The id of the platform
     #[arg(short, long)]
     pub platform_id: String,
+}
+
+/// Setup some test platforms
+#[derive(Args)]
+pub struct SetValidatorArgs {
+    /// Address of the validator we will modify
+    #[arg(short, long)]
+    pub validator: String,
+    /// Allowe the given validator
+    #[arg(long)]
+    pub allowed: bool,
 }

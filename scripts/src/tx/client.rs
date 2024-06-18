@@ -1,12 +1,14 @@
 use std::env;
 
 use alloy::{
-    network::{Ethereum, EthereumSigner},
+    hex,
+    network::{Ethereum, EthereumWallet},
+    primitives::B256,
     providers::{
-        fillers::{ChainIdFiller, FillProvider, GasFiller, JoinFill, NonceFiller, SignerFiller},
+        fillers::{ChainIdFiller, FillProvider, GasFiller, JoinFill, NonceFiller, WalletFiller},
         Identity, Provider, ProviderBuilder, ReqwestProvider,
     },
-    signers::{k256::ecdsa::SigningKey, wallet::Wallet},
+    signers::local::PrivateKeySigner,
 };
 use reqwest::{Client, Url};
 use tracing::info;
@@ -20,7 +22,7 @@ type RecommendFiller =
 /// An Ethers provider that uses a `LocalWallet` to generate signatures
 /// & interfaces with the RPC endpoint over HTTP
 pub type RpcProvider = FillProvider<
-    JoinFill<RecommendFiller, SignerFiller<EthereumSigner>>,
+    JoinFill<RecommendFiller, WalletFiller<EthereumWallet>>,
     ReqwestProvider,
     alloy::transports::http::Http<Client>,
     Ethereum,
@@ -29,16 +31,24 @@ pub type RpcProvider = FillProvider<
 /// Sets up the address and client with which to instantiate a contract for testing,
 /// reading in the private key, RPC url, and contract address from the environment.
 pub async fn create_rpc_provider() -> Result<RpcProvider, ScriptError> {
+    // Find our private key and map it to a B256B256::from_slice(&hex::decode(privateKey).unwrap())
+    let private_key = B256::from_slice(
+        &hex::decode(
+            env::var("PRIVATE_KEY")
+                .map_err(|e| ScriptError::ClientInitialization(e.to_string()))?,
+        )
+        .unwrap(),
+    );
     // Create our signer
-    let signer = env::var("PRIVATE_KEY")
-        .unwrap()
-        .parse::<Wallet<SigningKey>>()
+    let signer = PrivateKeySigner::from_bytes(&private_key)
         .map_err(|e| ScriptError::ClientInitialization(e.to_string()))?;
+
+    let wallet = EthereumWallet::from(signer);
 
     // Create our provider with the rpc client + signer
     let provider = ProviderBuilder::new()
         .with_recommended_fillers()
-        .signer(EthereumSigner::from(signer))
+        .wallet(wallet)
         .on_http(env::var("RPC_URL").unwrap().parse::<Url>().unwrap());
 
     // Fetch chain id
