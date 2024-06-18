@@ -1,10 +1,10 @@
 {
     "consumption": {
-        "deploy": "0x87f5f41f6535ec4e6bb8b303585f0a2a32db708e",
-        "init": "0xa9e2075e9d4ee1669ec5d7a9c32231c68c74c198d7f937721f6b4a8e72964900",
+        "deploy": "0xbad1a90c507f4f7476bda6b10c477504037d8094",
+        "init": "0x966b8be2b4e1e062f601ba3525ed799c47896bc232fd0e6a06188ea4cf6a065d",
         "txs": {
-            "create_platform_b0619b27c165cb8eb016dbfdcdbebed113641649d139147c3130c58eec9ef748": "0xf66206580c3c5c9cd0f3be611aa98da79cc81e7655489f647ef99abe6203facc",
-            "create_platform_c677e3f2d5d92b1948a20166887765b9ddd28d80f44cfd3a3ee2426cf550f76b": "0x06d75a597df6bcb35123a408d5cd4af207d845f5263e28ed40599c4471a676bb"
+            "create_platform_c677e3f2d5d92b1948a20166887765b9ddd28d80f44cfd3a3ee2426cf550f76b": "0x475d375eff2fb138acb7ae05eae3b9d3cd2d61be42d81e2ea4961bc6cee35a5f",
+            "create_platform_b0619b27c165cb8eb016dbfdcdbebed113641649d139147c3130c58eec9ef748": "0xee4bd12285d49cf4e625702b4ca208d1cf68fb2096a154e1a0b0912b3a0551c2"
         }
     }
 }

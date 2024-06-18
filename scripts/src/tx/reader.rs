@@ -61,10 +61,13 @@ pub async fn read_ccu_from_storage(
     bytes_to_hash[0..32].copy_from_slice(&user.into_word().to_vec());
     bytes_to_hash[32..64].copy_from_slice(&B256::ZERO.to_vec());
     let user_ptr = keccak256(bytes_to_hash);
+    info!("User ptr: {:?}", user_ptr);
     // Perform the second keccak
     bytes_to_hash[0..32].copy_from_slice(&platform_id.to_vec());
     bytes_to_hash[32..64].copy_from_slice(&user_ptr.to_vec());
     let storage_ptr = keccak256(bytes_to_hash);
+    info!("Platform id: {:?}", platform_id);
+    info!("Storage ptr: {:?}", storage_ptr);
 
     // Read the smart contract
     let storage: StorageValue = client
@@ -72,7 +75,7 @@ pub async fn read_ccu_from_storage(
         .await
         .map_err(|e| ScriptError::ContractInteraction(e.to_string()))?;
 
-    info!("Storage ptr: {:?}", storage_ptr);
+    info!("Storage value: {:?}",storage);
 
     // Get a storage proof
     let account_proof = client

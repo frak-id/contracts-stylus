@@ -16,9 +16,6 @@ sol! {
     error PlatformDontExist();
     error InvalidMetadata();
     error InvalidPlatformSignature();
-
-    // CCU related
-    error TooCloseConsumption();
 }
 
 #[derive(SolidityError)]
@@ -34,6 +31,4 @@ pub enum Errors {
     PlatformDontExist(PlatformDontExist),
     InvalidMetadata(InvalidMetadata),
     InvalidPlatformSignature(InvalidPlatformSignature),
-
-    TooCloseConsumption(TooCloseConsumption),
 }

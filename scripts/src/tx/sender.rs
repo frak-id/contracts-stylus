@@ -178,3 +178,48 @@ pub async fn push_ccu(
 
     Ok(receipt.transaction_hash)
 }
+
+/// Set a new validator
+pub async fn set_validator(
+    contract_address: Address,
+    validator: Address,
+    allowed: bool,
+    client: RpcProvider,
+) -> Result<TxHash, ScriptError> {
+    // Build our contract
+    let contract = IContentConsumptionContract::new(contract_address, client);
+
+    // Craft the register platform tx and send it
+    let allowed_validator_builder = contract.setAllowedValidator(validator, allowed);
+
+    // Test a call first
+    let set_validator_call = allowed_validator_builder
+        .call_raw()
+        .await
+        .map_err(|e| ScriptError::ContractInteraction(e.to_string()))?;
+    info!("Set allowed validator call: {:?}", set_validator_call);
+
+    // Then send it
+    let set_allowed_validator_tx = allowed_validator_builder
+        .send()
+        .await
+        .map_err(|e| ScriptError::ContractInteraction(e.to_string()))?;
+
+    // Send it
+    info!(
+        "Push validator on transaction... {}",
+        &set_allowed_validator_tx.tx_hash()
+    );
+
+    // Wait for the transaction to be included.
+    let receipt = set_allowed_validator_tx
+        .get_receipt()
+        .await
+        .map_err(|e| ScriptError::ContractInteraction(e.to_string()))?;
+    info!(
+        "Set validator tx done on block: {}",
+        receipt.block_number.unwrap()
+    );
+
+    Ok(receipt.transaction_hash)
+}
