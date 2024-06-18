@@ -12,7 +12,7 @@ use crate::{
     output_writer::{read_output_file, write_output_file, OutputKeys},
     tx::{
         client::RpcProvider,
-        reader::{get_nonce_on_platform, read_ccu_from_storage},
+        reader::read_ccu_from_storage,
         sender::{push_ccu, send_create_platform, send_init_consumption_contract, set_validator},
         typed_data::TypedDataSigner,
     },
@@ -121,12 +121,6 @@ pub async fn send_test_ccu(args: SendTestCcuArgs, client: RpcProvider) -> Result
         user_address, platform_id
     );
 
-    // Get the current user nonce on the given platform
-    let nonce =
-        get_nonce_on_platform(deployed_address, client.clone(), user_address, platform_id).await?;
-
-    info!("User nonce: {}", nonce);
-
     // Build deadline + added consumption
     let deadline = U256::MAX;
     let added_consumption = U256::from(1);
@@ -136,13 +130,7 @@ pub async fn send_test_ccu(args: SendTestCcuArgs, client: RpcProvider) -> Result
 
     // Get the validate consumption signature
     let signed_result = typed_data_signer
-        .get_validate_consumption_signature(
-            user_address,
-            platform_id,
-            added_consumption,
-            nonce,
-            deadline,
-        )
+        .get_validate_consumption_signature(user_address, platform_id, added_consumption, deadline)
         .await?;
     info!("Signed result: {:?}", signed_result.as_bytes());
 

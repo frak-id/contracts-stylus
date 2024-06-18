@@ -28,26 +28,6 @@ pub async fn get_domain_separator(
 }
 
 /// Get the current contract domain separator
-pub async fn get_nonce_on_platform(
-    contract_address: Address,
-    client: RpcProvider,
-    user: Address,
-    platform_id: B256,
-) -> Result<U256, ScriptError> {
-    // Build our contract
-    let contract = IContentConsumptionContract::new(contract_address, client);
-
-    // Read the smart contract
-    let nonce = contract
-        .getNonceForPlatform(user, platform_id)
-        .call()
-        .await
-        .map_err(|e| ScriptError::ContractInteraction(e.to_string()))?;
-
-    Ok(nonce._0)
-}
-
-/// Get the current contract domain separator
 pub async fn read_ccu_from_storage(
     contract_address: Address,
     client: RpcProvider,

@@ -69,7 +69,6 @@ impl TypedDataSigner {
         user: Address,
         platform_id: B256,
         added_consumption: U256,
-        nonce: U256,
         deadline: U256,
     ) -> Result<Signature, ScriptError> {
         // Build the validate consumption struct hash
@@ -78,7 +77,6 @@ impl TypedDataSigner {
                 address user;
                 bytes32 platformId;
                 uint256 addedConsumption;
-                uint256 nonce;
                 uint256 deadline;
             }
         }
@@ -86,7 +84,6 @@ impl TypedDataSigner {
             user,
             platformId: platform_id,
             addedConsumption: added_consumption,
-            nonce,
             deadline,
         };
 

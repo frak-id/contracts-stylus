@@ -7,7 +7,7 @@ extern crate core;
 #[global_allocator]
 static ALLOC: mini_alloc::MiniAlloc = mini_alloc::MiniAlloc::INIT;
 
-use alloc::{string::String, vec::Vec};
+use alloc::{string::String};
 
 use alloy_primitives::{keccak256, U64};
 use alloy_sol_types::SolType;
@@ -62,8 +62,6 @@ pub struct UserConsumption {
 pub struct ContentConsumptionContract {
     // The user activity storage (user => platform_id => UserConsumption)
     user_consumptions: StorageMap<Address, StorageMap<FixedBytes<32>, UserConsumption>>,
-    // The consumption nonce for each user's
-    consumption_nonce: StorageMap<FixedBytes<32>, StorageU256>,
     // All the allowed validator
     allowed_validators: StorageMap<Address, StorageBool>,
     // All the inherited contracts
@@ -76,15 +74,7 @@ pub struct ContentConsumptionContract {
 }
 
 // Private helper methods
-impl ContentConsumptionContract {
-    /// Get the user to platform nonce key
-    fn user_to_platform_nonce_key(user: Address, platform_id: FixedBytes<32>) -> FixedBytes<32> {
-        let mut nonce_data = Vec::new();
-        nonce_data.extend_from_slice(&user[..]);
-        nonce_data.extend_from_slice(&platform_id[..]);
-        keccak256(nonce_data)
-    }
-}
+impl ContentConsumptionContract {}
 
 /// Declare that `ContentConsumptionContract` is a contract with the following external methods.
 #[external]
@@ -110,13 +100,6 @@ impl ContentConsumptionContract {
         Ok(())
     }
 
-    /// Get the current nonce for the given platform
-    #[selector(name = "getNonceForPlatform")]
-    pub fn get_nonce_for_platform(&self, user: Address, platform_id: FixedBytes<32>) -> U256 {
-        self.consumption_nonce
-            .get(Self::user_to_platform_nonce_key(user, platform_id))
-    }
-
     /* -------------------------------------------------------------------------- */
     /*                                  CCU push                                  */
     /* -------------------------------------------------------------------------- */
@@ -136,18 +119,13 @@ impl ContentConsumptionContract {
         // No need to check that te platform exists, as the consumption will be rejected
         //  if the recovered address is zero, and if the owner doesn't match the recovered address
 
-        // Get the user consumption nonce
-        let nonce_key = Self::user_to_platform_nonce_key(user, platform_id);
-        let current_nonce = self.consumption_nonce.get(nonce_key);
-
         // Rebuild the signed data
         let struct_hash = keccak(
-            <sol! { (bytes32, address, bytes32, uint256, uint256, uint256) }>::encode(&(
-                keccak(b"ValidateConsumption(address user,bytes32 platformId,uint256 addedConsumption,uint256 nonce,uint256 deadline)").0,
+            <sol! { (bytes32, address, bytes32, uint256, uint256) }>::encode(&(
+                keccak(b"ValidateConsumption(address user,bytes32 platformId,uint256 addedConsumption,uint256 deadline)").0,
                 user,
                 platform_id.0,
                 added_consumption,
-                current_nonce,
                 deadline,
             )),
         );
@@ -171,18 +149,10 @@ impl ContentConsumptionContract {
             self.allowed_validators.setter(platform_owner).set(true);
         }
 
-        // Increase current nonce
-        self.consumption_nonce
-            .setter(nonce_key)
-            .set(current_nonce + U256::from(1));
-
         // Get the current state
         let mut storage_ptr = self.user_consumptions.setter(user);
         let mut storage_ptr = storage_ptr.setter(platform_id);
         let last_ccu = storage_ptr.ccu.get();
-
-        // Get the current timestamp
-        let current_timestamp = block::timestamp();
 
         let total_consumption = last_ccu + added_consumption;
 
@@ -198,7 +168,7 @@ impl ContentConsumptionContract {
         // Update the update timestamp
         storage_ptr
             .update_timestamp
-            .set(U64::from(current_timestamp));
+            .set(U64::from(block::timestamp()));
 
         // Return the success
         Ok(())
@@ -259,7 +229,7 @@ impl ContentConsumptionContract {
             .recover_typed_data_signer(struct_hash, v, r, s)?;
 
         // Ensure it's the owner who signed the platform creation
-        if recovered_address.is_zero() || recovered_address != self.owned.get_owner() {
+        if recovered_address != self.owned.get_owner() {
             return Err(Errors::Unauthorized(Unauthorized {}));
         }
 
