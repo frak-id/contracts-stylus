@@ -47,7 +47,7 @@ pub async fn deploy_contract(
 /// ```
 async fn predict_contract_address(client: RpcProvider) -> Result<Address, ScriptError> {
     // Get signer
-    let signer = client.signer().default_signer().address();
+    let signer = client.wallet().default_signer().address();
 
     // Get the signer nonce
     let signer_nonce = client

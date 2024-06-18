@@ -2,9 +2,14 @@ use std::env;
 
 use alloy::{
     core::sol,
+    hex,
     primitives::{keccak256, Address, B256, U256},
     providers::Provider,
-    signers::{k256::ecdsa::SigningKey, wallet::Wallet, Signature, Signer},
+    signers::{
+        k256::ecdsa::SigningKey,
+        local::{LocalSigner, PrivateKeySigner},
+        Signature, Signer,
+    },
     sol_types::{eip712_domain, Eip712Domain},
 };
 
@@ -13,7 +18,7 @@ use crate::{errors::ScriptError, tx::client::RpcProvider};
 /// Our global typed data signer, it will hold a few static stuff
 pub struct TypedDataSigner {
     // Our signer
-    signer: Wallet<SigningKey>,
+    signer: LocalSigner<SigningKey>,
     // The address of the deployed contract
     deployed_address: Address,
     // The current chain id
@@ -26,10 +31,16 @@ impl TypedDataSigner {
         client: RpcProvider,
         deployed_address: Address,
     ) -> Result<TypedDataSigner, ScriptError> {
-        // Get our signer
-        let signer = env::var("PRIVATE_KEY")
-            .unwrap()
-            .parse::<Wallet<SigningKey>>()
+        // Find our private key and map it to a B256B256::from_slice(&hex::decode(privateKey).unwrap())
+        let private_key = B256::from_slice(
+            &hex::decode(
+                env::var("PRIVATE_KEY")
+                    .map_err(|e| ScriptError::ClientInitialization(e.to_string()))?,
+            )
+            .unwrap(),
+        );
+        // Create our signer
+        let signer = PrivateKeySigner::from_bytes(&private_key)
             .map_err(|e| ScriptError::ClientInitialization(e.to_string()))?;
 
         // Get the chain id

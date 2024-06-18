@@ -95,7 +95,7 @@ impl ContentConsumptionContract {
     /* -------------------------------------------------------------------------- */
 
     /// Initialize the contract with an owner.
-    /// TODO: No constructor poossible atm, so going with init method called during contract creation via multicall
+    /// TODO: No constructor possible atm, so going with init method called during contract creation via multicall
     /// See: https://github.com/OffchainLabs/stylus-sdk-rs/issues/99
     #[selector(name = "initialize")]
     pub fn initialize(&mut self, owner: Address) -> Result<(), Errors> {

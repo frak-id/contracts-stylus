@@ -75,7 +75,7 @@ pub async fn read_ccu_from_storage(
         .await
         .map_err(|e| ScriptError::ContractInteraction(e.to_string()))?;
 
-    info!("Storage value: {:?}",storage);
+    info!("Storage value: {:?}", storage);
 
     // Get a storage proof
     let account_proof = client

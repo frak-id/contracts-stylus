@@ -1,6 +1,6 @@
 //! Definitions of CLI arguments and commands for deploy scripts
 
-use alloy::{primitives::U256};
+use alloy::primitives::U256;
 use clap::{Args, Parser, Subcommand};
 use tracing::info;
 

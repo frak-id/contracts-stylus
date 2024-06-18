@@ -41,7 +41,7 @@ pub async fn deploy_contracts(
 
     // Init the contracts
     info!("Init contracts...");
-    let deployer_address = client.signer().default_signer().address();
+    let deployer_address = client.wallet().default_signer().address();
     let tx_hash =
         send_init_consumption_contract(contract_address, deployer_address, client.clone()).await?;
     write_output_file(
