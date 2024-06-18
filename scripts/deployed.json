@@ -1,9 +1,9 @@
 {
     "consumption": {
-        "deploy": "0xfe4ebc398d6ca9f5c476f8ddd3f14cc95ccf89d7",
-        "init": "0xe339d8a9aeb6d0ec220dd35d850f26afeb8fec1a5bc4b7138ebdc2a508d881ab",
+        "deploy": "0x2a1b1e4e08b92ad78fd0a3e4395516377296a1b8",
+        "init": "0xf019f1c52474858e4772692717c195aedf31bed6cef0c2c22ae940091b498c1c",
         "txs": {
-            "create_platform_b0619b27c165cb8eb016dbfdcdbebed113641649d139147c3130c58eec9ef748": "0xb450c52356a63c9bff0ccc00631b0ec42df5d48bb015090a424ff83d17ca1f61"
+            "create_platform_b0619b27c165cb8eb016dbfdcdbebed113641649d139147c3130c58eec9ef748": "0x67e0ada8e2e332778b72b8a65b3e225815f20e9003b57b555836d3bab7c370bf"
         }
     }
 }

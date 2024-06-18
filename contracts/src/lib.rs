@@ -3,11 +3,18 @@
 extern crate alloc;
 extern crate core;
 
+use alloc::string::String;
+
+use stylus_sdk::prelude::entrypoint;
+
 /// Use an efficient WASM allocator.
 #[global_allocator]
 static ALLOC: mini_alloc::MiniAlloc = mini_alloc::MiniAlloc::INIT;
 
-use alloc::{string::String};
+// Utility functions and helpers used across the library
+mod errors;
+mod platform;
+mod utils;
 
 use alloy_primitives::{keccak256, U64};
 use alloy_sol_types::SolType;
@@ -16,27 +23,21 @@ use stylus_sdk::{
     alloy_sol_types::sol,
     block,
     crypto::keccak,
-    evm,
+    evm, msg,
     prelude::*,
-    storage::{StorageBool, StorageMap, StorageU256, StorageU64},
+    storage::{StorageAddress, StorageBool, StorageMap, StorageU256, StorageU64},
 };
 
-// Utility functions and helpers used across the library
-mod errors;
-mod platform;
-mod utils;
-
-use platform::{PlatformContract, PlatformParams};
-use utils::{
-    eip712::{Eip712, Eip712Params},
-    owned::{Owned, OwnedParams},
+use crate::{
+    errors::{
+        AlreadyInitialized, Errors, InvalidInitialize, InvalidPlatformSignature, Unauthorized,
+    },
+    platform::{PlatformContract, PlatformParams},
+    utils::eip712::{Eip712, Eip712Params},
 };
-
-use crate::errors::{Errors, InvalidPlatformSignature, Unauthorized};
 
 struct CoreParam;
 
-impl OwnedParams for CoreParam {}
 impl PlatformParams for CoreParam {}
 impl Eip712Params for CoreParam {
     // Static fields
@@ -46,6 +47,8 @@ impl Eip712Params for CoreParam {
 
 // Define events and errors in the contract
 sol! {
+    event OwnershipTransferred(address indexed owner);
+
     event CcuPushed(bytes32 indexed platformId, address user, uint256 totalConsumption);
 }
 
@@ -64,21 +67,30 @@ pub struct ContentConsumptionContract {
     user_consumptions: StorageMap<Address, StorageMap<FixedBytes<32>, UserConsumption>>,
     // All the allowed validator
     allowed_validators: StorageMap<Address, StorageBool>,
+    // The contract owner
+    owner: StorageAddress,
     // All the inherited contracts
     #[borrow]
     platform: PlatformContract<CoreParam>,
     #[borrow]
     eip712: Eip712<CoreParam>,
-    #[borrow]
-    owned: Owned<CoreParam>,
 }
 
 // Private helper methods
-impl ContentConsumptionContract {}
+impl ContentConsumptionContract {
+    /// Ensure that the caller is the owner.
+    fn only_owner(&self) -> Result<(), Errors> {
+        let caller = msg::sender();
+        if caller != self.owner.get() {
+            return Err(Errors::Unauthorized(Unauthorized {}));
+        }
+        Ok(())
+    }
+}
 
 /// Declare that `ContentConsumptionContract` is a contract with the following external methods.
 #[external]
-#[inherit(PlatformContract<CoreParam>, Owned<CoreParam>, Eip712<CoreParam>)]
+#[inherit(PlatformContract<CoreParam>, Eip712<CoreParam>)]
 impl ContentConsumptionContract {
     /* -------------------------------------------------------------------------- */
     /*                                 Constructor                                */
@@ -89,12 +101,24 @@ impl ContentConsumptionContract {
     /// See: https://github.com/OffchainLabs/stylus-sdk-rs/issues/99
     #[selector(name = "initialize")]
     pub fn initialize(&mut self, owner: Address) -> Result<(), Errors> {
+        // Ensure that the contract has not been initialized
+        if !self.owner.get().is_zero() {
+            return Err(Errors::AlreadyInitialized(AlreadyInitialized {}));
+        }
+        if owner.is_zero() {
+            return Err(Errors::InvalidInitialize(InvalidInitialize {}));
+        }
+
         // Init the eip712 domain
         self.eip712.initialize();
         // Init the contract with the given owner
-        self.owned.initialize(owner)?;
+        self.owner.set(owner);
+
         // Set that the owner is an allowed validator
         self.allowed_validators.setter(owner).set(true);
+
+        // Emit the transfer
+        evm::log(OwnershipTransferred { owner });
 
         // Return the success
         Ok(())
@@ -152,9 +176,7 @@ impl ContentConsumptionContract {
         // Get the current state
         let mut storage_ptr = self.user_consumptions.setter(user);
         let mut storage_ptr = storage_ptr.setter(platform_id);
-        let last_ccu = storage_ptr.ccu.get();
-
-        let total_consumption = last_ccu + added_consumption;
+        let total_consumption = storage_ptr.ccu.get() + added_consumption;
 
         // Emit the event
         evm::log(CcuPushed {
@@ -182,7 +204,7 @@ impl ContentConsumptionContract {
         allowed: bool,
     ) -> Result<(), Errors> {
         // Ensure that the caller is the owner
-        self.owned.only_owner()?;
+        self.only_owner()?;
 
         // Add the validator
         self.allowed_validators.setter(validator).set(allowed);
@@ -229,7 +251,7 @@ impl ContentConsumptionContract {
             .recover_typed_data_signer(struct_hash, v, r, s)?;
 
         // Ensure it's the owner who signed the platform creation
-        if recovered_address != self.owned.get_owner() {
+        if recovered_address != self.owner.get() {
             return Err(Errors::Unauthorized(Unauthorized {}));
         }
 
