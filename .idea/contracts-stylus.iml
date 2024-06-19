@@ -2,11 +2,12 @@
 <module type="EMPTY_MODULE" version="4">
   <component name="NewModuleRootManager">
     <content url="file://$MODULE_DIR$">
-      <sourceFolder url="file://$MODULE_DIR$/contracts/src" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/scripts/src" isTestSource="false" />
-      <excludeFolder url="file://$MODULE_DIR$/contracts/target" />
+      <sourceFolder url="file://$MODULE_DIR$/contracts-old/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/contracts-stylus/src" isTestSource="false" />
       <excludeFolder url="file://$MODULE_DIR$/scripts/target" />
       <excludeFolder url="file://$MODULE_DIR$/target" />
+      <excludeFolder url="file://$MODULE_DIR$/contracts-stylus/target" />
     </content>
     <orderEntry type="inheritedJdk" />
     <orderEntry type="sourceFolder" forTests="false" />

@@ -1,6 +1,7 @@
 //! Helper to use eip712 separator on a given contract
 use core::marker::PhantomData;
 
+use inkmate_common::crypto::ecrecover::EcRecoverTrait;
 use stylus_sdk::{
     alloy_primitives::{Address, FixedBytes, B256, U256, U64},
     alloy_sol_types::{sol, SolType},
@@ -10,8 +11,10 @@ use stylus_sdk::{
     storage::{StorageB256, StorageU64},
 };
 
-use super::signature::{EcRecoverTrait, PrecompileEcRecover};
-use crate::errors::{EcRecoverError, Errors};
+use crate::utils::{
+    errors::{EcRecoverError, Errors},
+    signature::PrecompileEcRecover,
+};
 
 pub trait Eip712Params {
     // Name of the contract
@@ -88,6 +91,8 @@ impl<T: Eip712Params> Eip712<T> {
         digest_input[1] = 0x01;
         digest_input[2..34].copy_from_slice(&self.domain_separator()?[..]);
         digest_input[34..66].copy_from_slice(&struct_hash[..]);
+
+        // TODO the ecdsa recovery we need:
 
         // Do an ecdsa recovery check on the signature
         let recovered_address = Address::from_slice(

@@ -1,9 +1,6 @@
 {
     "consumption": {
-        "deploy": "0x2a1b1e4e08b92ad78fd0a3e4395516377296a1b8",
-        "init": "0xf019f1c52474858e4772692717c195aedf31bed6cef0c2c22ae940091b498c1c",
-        "txs": {
-            "create_platform_b0619b27c165cb8eb016dbfdcdbebed113641649d139147c3130c58eec9ef748": "0x67e0ada8e2e332778b72b8a65b3e225815f20e9003b57b555836d3bab7c370bf"
-        }
+        "deploy": "0x5d0afb98189df045d3fa2f6d5ccf10dd3cd482e4",
+        "init": "0xc7443a079a4267801066929324b3f02a7eb53d5c27461866da7d067368f7ec94"
     }
 }

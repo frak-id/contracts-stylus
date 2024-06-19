@@ -16,7 +16,7 @@ impl WasmBuilder {
         let workspace_path = current_dir
             .parent()
             .ok_or(ScriptError::ContractCompilation(String::from(
-                "Could not find contracts directory",
+                "Could not find contracts-stylus directory",
             )))?;
 
         // Build the initial wasm file
@@ -44,7 +44,7 @@ impl WasmBuilder {
         build_cmd.arg("build");
         // Use the release profile
         build_cmd.arg("-r");
-        // Build the contracts-stylus package
+        // Build the contracts-stylus-stylus package
         build_cmd.arg("-p");
         build_cmd.arg(contract_profile);
         // Set the build target to WASM

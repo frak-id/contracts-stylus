@@ -3,7 +3,7 @@ use std::env;
 use alloy::{
     core::sol,
     hex,
-    primitives::{keccak256, Address, B256, U256},
+    primitives::{Address, B256, U256},
     providers::Provider,
     signers::{
         k256::ecdsa::SigningKey,
@@ -91,38 +91,6 @@ impl TypedDataSigner {
         Ok(self
             .signer
             .sign_typed_data(&validate_consumption, &self.get_domain())
-            .await
-            .unwrap())
-    }
-
-    /// Get the register platform signature
-    pub async fn get_register_platform_signature(
-        &self,
-        owner: Address,
-        name: String,
-        origin: String,
-        deadline: U256,
-    ) -> Result<Signature, ScriptError> {
-        // Build the validate consumption struct hash
-        sol! {
-            struct CreateNewPlatform {
-                address owner;
-                bytes32 name;
-                bytes32 origin;
-                uint256 deadline;
-            }
-        }
-        let create_platform = CreateNewPlatform {
-            owner,
-            name: keccak256(&name.as_bytes()),
-            origin: keccak256(&origin.as_bytes()),
-            deadline,
-        };
-
-        // Ask the client to sign the given typed data
-        Ok(self
-            .signer
-            .sign_typed_data(&create_platform, &self.get_domain())
             .await
             .unwrap())
     }

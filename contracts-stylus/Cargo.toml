@@ -1,5 +1,6 @@
 [package]
 name = "frak-contracts-stylus"
+categories = ["no-std", "wasm"]
 version = "0.1.0"
 edition = "2021"
 license = "GNU-GPLv3"
@@ -7,18 +8,17 @@ homepage = "https://github.com/frak-id/contracts-stylus"
 repository = "https://github.com/frak-id/contracts-stylus"
 keywords = ["arbitrum", "ethereum", "stylus", "frak"]
 description = "This repository houses the Rust implementation of the Content Consumption Tracker contract for the Arbitrum Stylus network"
+publish = false
 
 [dependencies]
-alloy-primitives = { workspace = true }
-alloy-sol-types = { workspace = true }
-mini-alloc = { workspace = true }
-stylus-sdk = { workspace = true }
-hex = { workspace = true }
+alloy-primitives = { workspace = true, default-features = false }
+alloy-sol-types = { workspace = true, default-features = false }
+stylus-sdk.workspace = true
+stylus-proc.workspace = true
+mini-alloc.workspace = true
+# todo: Forced to used 'std' import to prevent panic definition clash
+openzeppelin-stylus = { workspace = true, features = ["ownable", "erc20", "std"] }
 inkmate-common = "0.0.1"
-
-[features]
-export-abi = ["stylus-sdk/export-abi"]
-debug = ["stylus-sdk/debug"]
 
 [lib]
 crate-type = ["lib", "cdylib"]
