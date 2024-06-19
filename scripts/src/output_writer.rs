@@ -9,8 +9,6 @@ pub enum OutputKeys {
     Deployment { key: &'static str },
     // Key related to the init of a contract
     Init { key: &'static str },
-    // Key related to a platform creation
-    Tx { key: &'static str, tx_key: String },
 }
 
 /// Read a deployed address
@@ -27,7 +25,6 @@ pub fn read_output_file(file_path: &str, key: OutputKeys) -> Result<String, Scri
     let final_key = match key {
         OutputKeys::Deployment { key } => parsed_json[key]["deploy"].clone(),
         OutputKeys::Init { key } => parsed_json[key]["init"].clone(),
-        OutputKeys::Tx { key, tx_key } => parsed_json[key]["txs"][tx_key].clone(),
     };
 
     Ok(final_key.as_str().unwrap().to_string())
@@ -55,9 +52,6 @@ pub fn write_output_file<T: LowerHex>(
         }
         OutputKeys::Init { key } => {
             parsed_json[key]["init"] = JsonValue::String(format!("{value:#x}"))
-        }
-        OutputKeys::Tx { key, tx_key } => {
-            parsed_json[key]["txs"][tx_key] = JsonValue::String(format!("{value:#x}"))
         }
     };
 

@@ -33,5 +33,5 @@ reqwest = "0.12.4"
 log = "0.4.21"
 dotenv = "0.15.0"
 
-# Not in global workspace, to prevent clash with stylus contracts
+# Not in global workspace, to prevent clash with stylus contracts-stylus
 [workspace]

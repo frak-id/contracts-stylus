@@ -1,4 +1,4 @@
-//! Scripts for deploying and initializing the Frak smart contracts.
+//! Scripts for deploying and initializing the Frak smart contracts-stylus.
 
 #![deny(clippy::missing_docs_in_private_items)]
 #![allow(incomplete_features)]

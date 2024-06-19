@@ -1,16 +1,16 @@
 [workspace]
 members = [
-    "contracts"
+    "contracts-stylus"
 ]
 resolver = "2"
 
 [workspace.dependencies]
-alloy-primitives ={ version =  "0.3.1", default-features = false }
+alloy-primitives = { version = "0.3.1", default-features = false }
 alloy-sol-types = { version = "0.3.1", default-features = false }
-mini-alloc = "0.4.2"
-stylus-sdk = {version = "0.5.0", default-features = false }
+stylus-sdk = { version = "0.5.0", default-features = false }
 stylus-proc = { version = "0.5.0", default-features = false }
-hex = "0.4.3"
+mini-alloc = "0.4.2"
+openzeppelin-stylus = { git = "https://github.com/OpenZeppelin/rust-contracts-stylus", rev = "43d6b78" }
 
 [profile.release]
 codegen-units = 1        # prefer efficiency to compile time
@@ -22,11 +22,5 @@ rpath = false            # no run-time search path
 debug-assertions = false # prune debug assertions
 incremental = false      # no incremental builds
 
-[profile.binary-profiling]
-inherits = "dev"
-codegen-units = 1   # prefer efficiency to compile time
-panic = "abort"     # use simple panics
-opt-level = 3       # optimize for performance (default for most contracts)
-lto = true          # link time optimization
-rpath = false       # no run-time search path
-incremental = false # no incremental builds
+[profile.dev]
+panic = "abort"
