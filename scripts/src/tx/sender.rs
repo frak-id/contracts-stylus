@@ -28,6 +28,10 @@ pub async fn send_init_consumption_contract(
             frakContentId: frak_id,
         })
         .with_value(U256::from(0));
+    info!(
+        "Sending init call with owner: {:?}, content registry {:?}, frak_id {:?}",
+        owner, content_registry, frak_id
+    );
 
     // Send it
     let pending_tx = client
@@ -68,7 +72,7 @@ pub async fn push_ccu(
     let send_ccu_call = send_ccu_tx_builder
         .call_raw()
         .await
-        .map_err(|e| ScriptError::ContractInteraction(e.to_string()))?;
+        .map_err(|e| ScriptError::ContractSimulation(e.to_string()))?;
     info!("Push CCU call: {:?}", send_ccu_call);
 
     // Then send it
@@ -92,3 +96,10 @@ pub async fn push_ccu(
 
     Ok(receipt.transaction_hash)
 }
+// 0xceea21b6
+// 0x609c6d7f
+// b0619b27c165cb8eb016dbfdcdbebed113641649d139147c3130c58eec9ef748
+// 000000000000000000000000f2502c2f6bc19cdbdd1b8565ad6fbc29efe4f464
+
+// 0xb0619b27c165cb8eb016dbfdcdbebed113641649d139147c3130c58eec9ef748
+// 0x0000000000000000000000000000000000000000000000000000000000000000

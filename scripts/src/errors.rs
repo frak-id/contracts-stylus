@@ -19,6 +19,7 @@ pub enum ScriptError {
     /// Error compiling a contract
     ContractCompilation(String),
     /// Error calling a contract method
+    ContractSimulation(String),
     ContractInteraction(String),
 }
 
@@ -34,6 +35,9 @@ impl Display for ScriptError {
             ScriptError::ContractCompilation(s) => write!(f, "error compiling contract: {}", s),
             ScriptError::ContractInteraction(s) => {
                 write!(f, "error interacting with contract: {}", s)
+            }
+            ScriptError::ContractSimulation(s) => {
+                write!(f, "error simulated contract call: {}", s)
             }
         }
     }

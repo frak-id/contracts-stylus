@@ -85,7 +85,6 @@ pub async fn send_test_ccu(args: SendTestCcuArgs, client: RpcProvider) -> Result
     let signed_result = typed_data_signer
         .get_validate_consumption_signature(user, channel_id, added_consumption, deadline)
         .await?;
-    info!("Signed result: {:?}", signed_result.as_bytes());
 
     // Send the tx
     push_ccu(

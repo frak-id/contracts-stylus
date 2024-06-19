@@ -56,7 +56,7 @@ impl TypedDataSigner {
     // Get the current domain
     pub fn get_domain(&self) -> Eip712Domain {
         eip712_domain! {
-            name: "ContentConsumption",
+            name: "ChannelConsumption",
             version: "0.0.1",
             chain_id: self.chain_id,
             verifying_contract: self.deployed_address,
@@ -67,7 +67,7 @@ impl TypedDataSigner {
     pub async fn get_validate_consumption_signature(
         &self,
         user: Address,
-        platform_id: B256,
+        channel_id: B256,
         added_consumption: U256,
         deadline: U256,
     ) -> Result<Signature, ScriptError> {
@@ -75,14 +75,14 @@ impl TypedDataSigner {
         sol! {
             struct ValidateConsumption {
                 address user;
-                bytes32 platformId;
+                bytes32 channelId;
                 uint256 addedConsumption;
                 uint256 deadline;
             }
         }
         let validate_consumption = ValidateConsumption {
             user,
-            platformId: platform_id,
+            channelId: channel_id,
             addedConsumption: added_consumption,
             deadline,
         };

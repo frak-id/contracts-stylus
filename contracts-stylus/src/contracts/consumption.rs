@@ -1,25 +1,26 @@
-use alloy_primitives::{Address, FixedBytes, U256, U64};
+use alloc::vec::Vec;
+
+use alloy_primitives::{Address, FixedBytes, U256};
 use alloy_sol_types::{SolCall, SolType};
 use openzeppelin_stylus::access::ownable::Ownable;
 use stylus_sdk::{
     alloy_sol_types::sol,
-    block,
-    call::RawCall,
+    call::call,
     crypto::keccak,
     evm, msg,
     prelude::*,
-    storage::{StorageAddress, StorageMap, StorageU256, StorageU64},
+    storage::{StorageAddress, StorageMap, StorageU256},
 };
 
 use crate::utils::{
     eip712::{Eip712, Eip712Params},
-    errors::{AlreadyInitialized, Errors, InvalidPlatformSignature},
+    errors::{AlreadyInitialized, CallError, Errors, InvalidPlatformSignature},
     solidity::isAuthorizedCall,
 };
 
 // Define events and errors in the contract
 sol! {
-    event CcuPushed(bytes32 indexed channelId, address user, uint256 totalConsumption);
+    event CcuPushed(bytes32 indexed channelId, address indexed user, uint256 totalConsumption);
 }
 
 struct ConsumptionParam;
@@ -30,19 +31,12 @@ impl Eip712Params for ConsumptionParam {
     const VERSION: &'static str = "0.0.1";
 }
 
-/// Define the user consumption data on the given platform
-#[solidity_storage]
-pub struct UserConsumption {
-    ccu: StorageU256,
-    update_timestamp: StorageU64,
-}
-
 /// Define the global contract storage
 #[solidity_storage]
 #[entrypoint]
 pub struct ChannelConsumptionContract {
     // The user activity storage (user => channel_id => UserConsumption)
-    user_consumptions: StorageMap<Address, StorageMap<FixedBytes<32>, UserConsumption>>,
+    user_consumptions: StorageMap<Address, StorageMap<FixedBytes<32>, StorageU256>>,
     // Some general configurations
     frak_content_id: StorageU256,
     content_registry: StorageAddress,
@@ -53,6 +47,30 @@ pub struct ChannelConsumptionContract {
     ownable: Ownable,
     #[borrow]
     eip712: Eip712<ConsumptionParam>,
+}
+
+/// Some internal helpers
+impl ChannelConsumptionContract {
+    /// Check that the validator has the right roles
+    pub fn _check_validator_role(&mut self, validator: Address) -> Result<(), Errors> {
+        // Ensure the signer has the interaction validator roles for this content)
+        let content_registry = self.content_registry.get();
+        let has_role = call_helper::<isAuthorizedCall>(
+            self,
+            content_registry,
+            (self.frak_content_id.get(), validator),
+        )
+        .map_err(|_| Errors::CallError(CallError {}))?;
+
+        // Return the right state depending on the output
+        if has_role._0 {
+            Ok(())
+        } else {
+            Err(Errors::InvalidPlatformSignature(
+                InvalidPlatformSignature {},
+            ))
+        }
+    }
 }
 
 /// Declare that `ContentConsumptionContract` is a contract with the following external methods.
@@ -124,33 +142,19 @@ impl ChannelConsumptionContract {
             .eip712
             .recover_typed_data_signer(struct_hash, v, r, s)?;
 
-        // Check if the validator has the validation roles
-        let calldata = isAuthorizedCall {
-            _contentId: self.frak_content_id.get(),
-            _caller: recovered_address,
-        }
-        .encode();
-
         // Ensure the signer has the interaction validator roles for this content)
-        let content_registry = self.content_registry.get();
-        let has_all_roles_raw_result = RawCall::new_static()
-            .call(content_registry, &calldata)
-            .map_err(|_| Errors::InvalidPlatformSignature(InvalidPlatformSignature {}))?;
-        let has_role = isAuthorizedCall::decode_returns(&has_all_roles_raw_result, false)
-            .map_err(|_| Errors::InvalidPlatformSignature(InvalidPlatformSignature {}))?;
-
-        // If it doesn't have the roles, return an error
-        if !has_role._0 {
-            return Err(Errors::InvalidPlatformSignature(
-                InvalidPlatformSignature {},
-            ));
+        let check_result = self._check_validator_role(recovered_address);
+        if check_result.is_err() {
+            // Early exit cause it's failing otherwise
+            // Always passing the same error to avoid leaking information
+            return Ok(());
         }
 
         // Get the current state
         let mut storage_ptr = self.user_consumptions.setter(user);
         let mut storage_ptr = storage_ptr.setter(channel_id);
 
-        let total_consumption = storage_ptr.ccu.get() + added_consumption;
+        let total_consumption = storage_ptr.get() + added_consumption;
 
         // Emit the event
         evm::log(CcuPushed {
@@ -160,11 +164,7 @@ impl ChannelConsumptionContract {
         });
 
         // Update the ccu amount
-        storage_ptr.ccu.set(total_consumption);
-        // Update the update timestamp
-        storage_ptr
-            .update_timestamp
-            .set(U64::from(block::timestamp()));
+        storage_ptr.set(total_consumption);
 
         // Update the whole total consumption
         self.total_consumption
@@ -183,10 +183,9 @@ impl ChannelConsumptionContract {
     ) -> Result<U256, Errors> {
         // Get the user consumption
         let storage_ptr = self.user_consumptions.get(user);
-        let storage_ptr = storage_ptr.get(channel_id);
 
         // Return the consumption
-        Ok(storage_ptr.ccu.get())
+        Ok(storage_ptr.get(channel_id))
     }
 
     /// Get the total consumption handled by the contract
@@ -194,4 +193,15 @@ impl ChannelConsumptionContract {
     pub fn get_total_consumption(&self) -> Result<U256, Errors> {
         Ok(self.total_consumption.get())
     }
+}
+
+/// Simple helper to perform call to another smart contract
+pub fn call_helper<C: SolCall>(
+    storage: &mut impl TopLevelStorage,
+    address: Address,
+    args: <C::Arguments<'_> as SolType>::RustType,
+) -> Result<C::Return, Vec<u8>> {
+    let calldata = C::new(args).encode();
+    let res = call(storage, address, &calldata)?;
+    C::decode_returns(&res, false).map_err(|_| b"decoding error".to_vec())
 }

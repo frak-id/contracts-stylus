@@ -1,6 +1,4 @@
-use alloy::{
-    primitives::{Address, B256}
-};
+use alloy::primitives::{Address, B256};
 
 use crate::{
     errors::ScriptError,
