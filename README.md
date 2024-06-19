@@ -2,38 +2,47 @@
 
 [![Project license](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://github.com/frak-id/contracts-stylus/LICENSE.txt)
 
-## Content Consumption Tracker Contract for Arbitrum Stylus
+## Bringing Web2 Anti-Cheat Mechanisms to Web3 with Arbitrum Stylus
 
-This repository houses the Rust implementation of the Content Consumption Tracker contract for the Arbitrum Stylus network.
+This repository houses a Rust implementation of a Content Consumption Tracker contract, specifically designed for the [Arbitrum Stylus](https://arbitrum.io/stylus). 
 
-**Contract Overview**
+This contract leverages the performance benefits of Stylus (using **WASM**) to port a Web2 anti-cheat mechanism to a blockchain environment, enhancing the security and trust of content consumption data.
 
-The Content Consumption Tracker contract is designed to securely record and verify user engagement with content across various platforms on the Arbitrum Stylus blockchain. 
+**Context**
 
-It provides a reliable mechanism for tracking content consumption data, leveraging cryptographic techniques to ensure data integrity. 
+Frak is building a decentralized ecosystem for content interactions, with a strong focus on accurate and reliable consumption tracking. 
 
-**Key Features:**
+You can find the Solidity smart contracts for the broader Frak ecosystem [here](https://github.com/frak-id/contracts-v2).
 
-* **Platform Integration:** Platforms can easily integrate with the contract to track user activity. 
-* **Cryptographic Verification:**  The contract utilizes BLS signatures, a robust cryptographic scheme, to verify the authenticity of content consumption data submitted by users. 
-* **Efficient and Transparent:**  The contract is designed for efficient operation and provides a transparent record of content consumption on the Arbitrum Stylus blockchain. 
+This Stylus contract builds upon Frak's existing anti-cheat system, bringing key parts of it on-chain to further improve security and transparency. 
 
-**Development**
+## Key Features
 
-This contract is being developed in Rust, tailored for the Arbitrum Stylus WASM environment. 
+:sparkles: Proof-of-concept (POC) using ECDSA signatures for data verification.
+:sparkles: Integrates with the Frak Content Registry for content verification. 
 
-**Deployment**
+## Roadmap
 
-Consumption Tracker contract deployed on stylus testnet v2 at [0xcedf49740cf7f008981e9e0dc44798bc53dec299](`https://stylusv2-explorer.arbitrum.io/address/0xcedf49740cf7f008981e9e0dc44798bc53dec299`)
+- [x] ⚗️ POC with ECDSA signatures.
+- [x] 🗃️️ Link with the **ContentRegistry** from [contracts-v2](https://github.com/frak-id/contracts-v2).
+- [x] 🔨 Deployment and simple test scripts.
+- [ ] 🧪 Unit tests.
+- [ ] 🔒️ MerkleProof validation for channel IDs.
+- [ ] 🗃️ **LZ compression** of calldata using Rust.
+- [ ] 🔒️ **ZKP** for verifying consumption without content reveal.
+- [ ] 🔒️ **Grooth16** sig for batched CCU submissions.
 
-**Deployment Script**
+## Technologies Used
 
-Hugely inspired from [Renegade-fi](https://github.com/renegade-fi/renegade-contracts/tree/main/scripts) stylus scripts.
+- [OpenZeppelin/rust-contracts-stylus](https://github.com/OpenZeppelin/rust-contracts-stylus): For core smart contract logic.
+- [alloy-rs/alloy](https://github.com/alloy-rs/alloy): For all scripting and tooling.
 
-**Contributing**
+Script inspired by [Renegade-fi](https://github.com/renegade-fi/renegade-contracts/tree/main/scripts).
 
-We welcome contributions to this project. Feel free to open an issue or submit a pull request.
+## Contributing
 
-**License**
+Contributions are welcome! Let's build a more secure and transparent content consumption tracking system. Open an issue or submit a pull request. 
 
-This project is licensed under the GPL-V3 license. Refer to the LICENSE file for details. 
+## License
+
+GPL-V3 
