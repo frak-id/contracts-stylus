@@ -1,6 +1,6 @@
 {
     "consumption": {
-        "deploy": "0xcf3bab87d6a9f7a617af2be5dc6516a4f5e05353",
-        "init": "0xf30594b0bd83582220b4182923fcd1500a1f0f9815de595d7793119200fd7771"
+        "deploy": "0x5f83f5780b301b4efb8dda2715b280ba297baea0",
+        "init": "0x493726219c9dfaf820f55b7691686397803281008a1425ca6d34adcd745afd46"
     }
 }

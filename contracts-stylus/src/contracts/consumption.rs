@@ -20,7 +20,7 @@ use crate::utils::{
 
 // Define events and errors in the contract
 sol! {
-    event CcuPushed(bytes32 indexed channelId, address indexed user, uint256 totalConsumption);
+    event CcuPushed(address indexed user, bytes32 channelId, uint256 totalConsumption);
 }
 
 struct ConsumptionParam;
@@ -35,8 +35,8 @@ impl Eip712Params for ConsumptionParam {
 #[solidity_storage]
 #[entrypoint]
 pub struct ChannelConsumptionContract {
-    // The user activity storage (user => channel_id => UserConsumption)
-    user_consumptions: StorageMap<Address, StorageMap<FixedBytes<32>, StorageU256>>,
+    // The user activity storage (user => UserConsumption)
+    user_consumptions: StorageMap<Address, StorageU256>,
     // Some general configurations
     frak_content_id: StorageU256,
     content_registry: StorageAddress,
@@ -152,14 +152,13 @@ impl ChannelConsumptionContract {
 
         // Get the current state
         let mut storage_ptr = self.user_consumptions.setter(user);
-        let mut storage_ptr = storage_ptr.setter(channel_id);
 
         let total_consumption = storage_ptr.get() + added_consumption;
 
         // Emit the event
         evm::log(CcuPushed {
-            channelId: channel_id.0,
             user,
+            channelId: channel_id.0,
             totalConsumption: total_consumption,
         });
 
@@ -174,18 +173,14 @@ impl ChannelConsumptionContract {
         Ok(())
     }
 
-    /// Get the consumption of a user on a given platform
+    /// Get the total consumption of a user
     #[selector(name = "getUserConsumption")]
     pub fn get_user_consumption(
         &self,
         user: Address,
-        channel_id: FixedBytes<32>,
     ) -> Result<U256, Errors> {
-        // Get the user consumption
-        let storage_ptr = self.user_consumptions.get(user);
-
         // Return the consumption
-        Ok(storage_ptr.get(channel_id))
+        Ok(self.user_consumptions.get(user))
     }
 
     /// Get the total consumption handled by the contract
